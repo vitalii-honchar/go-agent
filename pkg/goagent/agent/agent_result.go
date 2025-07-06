@@ -2,7 +2,7 @@ package agent
 
 import (
 	"fmt"
-	"reddit-analyzer/internal/agent/llm"
+	"go-agent/pkg/goagent/llm"
 )
 
 type AgentResult[T any] struct {

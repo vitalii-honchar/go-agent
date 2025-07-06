@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"reddit-analyzer/internal/agent/llm"
+	"go-agent/pkg/goagent/llm"
 
 	"github.com/invopop/jsonschema"
 	"github.com/xeipuuv/gojsonschema"

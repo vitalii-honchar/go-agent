@@ -7,9 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"goagent/agent/agent"
-
-	"github.com/vitalii-honchar/goagent/pkg/agent/llm"
+	"go-agent/pkg/goagent/agent"
+	"go-agent/pkg/goagent/llm"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
