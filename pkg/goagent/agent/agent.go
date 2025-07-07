@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"go-agent/pkg/goagent/llm"
+	"strings"
 
 	"github.com/invopop/jsonschema"
 	"github.com/xeipuuv/gojsonschema"
@@ -89,7 +90,7 @@ func WithLLMConfig[T any](config llm.LLMConfig) AgentOption[T] {
 
 func WithBehavior[T any](behavior string) AgentOption[T] {
 	return func(a *Agent[T]) {
-		a.behavior = behavior
+		a.behavior = strings.TrimSpace(behavior)
 	}
 }
 
