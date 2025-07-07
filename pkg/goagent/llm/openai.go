@@ -3,9 +3,9 @@ package llm
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
-	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/errors"
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
 )
@@ -143,12 +143,21 @@ func (o *openAILLM) createMessages(msgs []LLMMessage) ([]openai.ChatCompletionMe
 			openAIMessages = append(openAIMessages, openai.UserMessage(msg.Content))
 		case LLMMessageTypeAssistant:
 			if len(msg.ToolCalls) > 0 {
-
-				messages, err := o.addToolResults(openAIMessages, msg)
+				// First add the assistant message with tool calls
+				messages, err := o.addToolCalls(openAIMessages, msg)
 				if err != nil {
 					return nil, err
 				}
 				openAIMessages = messages
+
+				// Then add tool results if any
+				if len(msg.ToolResults) > 0 {
+					messages, err = o.addToolResults(openAIMessages, msg)
+					if err != nil {
+						return nil, err
+					}
+					openAIMessages = messages
+				}
 			} else {
 				openAIMessages = append(openAIMessages, openai.AssistantMessage(msg.Content))
 			}
@@ -159,13 +168,28 @@ func (o *openAILLM) createMessages(msgs []LLMMessage) ([]openai.ChatCompletionMe
 }
 
 func (o *openAILLM) addToolCalls(openAIMessages []openai.ChatCompletionMessageParamUnion, msg LLMMessage) ([]openai.ChatCompletionMessageParamUnion, error) {
+	var toolCalls []openai.ChatCompletionMessageToolCallParam
+
 	for _, toolCall := range msg.ToolCalls {
-		toolCallJson, err := json.Marshal(toolCall)
+		argsJSON, err := json.Marshal(toolCall.Args)
 		if err != nil {
 			return nil, fmt.Errorf("%w: %w", ErrFailedToMarshalToolCall, err)
 		}
-		openAIMessages = append(openAIMessages, openai.ToolMessage(string(toolCallJson), toolCall.GetID()))
+
+		toolCalls = append(toolCalls, openai.ChatCompletionMessageToolCallParam{
+			ID: toolCall.ID,
+			Function: openai.ChatCompletionMessageToolCallFunctionParam{
+				Name:      toolCall.ToolName,
+				Arguments: string(argsJSON),
+			},
+		})
 	}
+
+	assistantMsg := openai.AssistantMessage(msg.Content)
+	assistantMsg.OfAssistant.ToolCalls = toolCalls
+
+	openAIMessages = append(openAIMessages, assistantMsg)
+
 	return openAIMessages, nil
 }
 
