@@ -44,24 +44,26 @@ OUTPUT SCHEMA:
 `)
 
 type Agent[T any] struct {
-	name         string
-	llm          llm.LLM
-	llmConfig    llm.LLMConfig
-	tools        map[string]llm.LLMTool
-	limits       map[string]int
-	outputSchema *T
-	systemPrompt Prompt
-	behavior     string
-	schemaLoader gojsonschema.JSONLoader
+	name             string
+	llm              llm.LLM
+	llmConfig        llm.LLMConfig
+	tools            map[string]llm.LLMTool
+	limits           map[string]int
+	defaultToolLimit int
+	outputSchema     *T
+	systemPrompt     Prompt
+	behavior         string
+	schemaLoader     gojsonschema.JSONLoader
 }
 
 type AgentOption[T any] func(*Agent[T])
 
 func NewAgent[T any](options ...AgentOption[T]) (*Agent[T], error) {
 	agent := &Agent[T]{
-		tools:        make(map[string]llm.LLMTool),
-		limits:       make(map[string]int),
-		systemPrompt: systemPromptTemplate,
+		tools:            make(map[string]llm.LLMTool),
+		limits:           make(map[string]int),
+		defaultToolLimit: 3,
+		systemPrompt:     systemPromptTemplate,
 	}
 	for _, opt := range options {
 		opt(agent)
@@ -124,12 +126,25 @@ func WithToolLimit[T any](name string, limit int) AgentOption[T] {
 	}
 }
 
+func WithDefaultToolLimit[T any](limit int) AgentOption[T] {
+	return func(a *Agent[T]) {
+		a.defaultToolLimit = limit
+	}
+}
+
 type AgentState struct {
 	Messages []llm.LLMMessage
 }
 
 func (a *AgentState) AddMessage(msg llm.LLMMessage) {
 	a.Messages = append(a.Messages, msg)
+}
+
+func (a *Agent[T]) getToolLimit(name string) int {
+	if limit, exists := a.limits[name]; exists {
+		return limit
+	}
+	return a.defaultToolLimit
 }
 
 func (a *Agent[T]) Run(ctx context.Context, input any) (*AgentResult[T], error) {
@@ -140,14 +155,6 @@ func (a *Agent[T]) Run(ctx context.Context, input any) (*AgentResult[T], error) 
 	usage := make(map[string]int)
 
 	for {
-		// if a.isLimitReached(usage) {
-		// 	res, err := a.createResult(state)
-		// 	if err != nil {
-		// 		return nil, fmt.Errorf("%w: %s", ErrLimitReached, err)
-		// 	}
-		// 	return res, ErrLimitReached
-		// }
-
 		llmMessage, err := a.llm.Call(ctx, state.Messages)
 		if err != nil {
 			return nil, fmt.Errorf("%w: %s", ErrLLMCall, err)
@@ -156,6 +163,13 @@ func (a *Agent[T]) Run(ctx context.Context, input any) (*AgentResult[T], error) 
 		if llmMessage.ToolCalls != nil {
 			results, err := a.callTools(llmMessage, usage)
 			if err != nil {
+				if errors.Is(err, ErrLimitReached) {
+					state.AddMessage(llmMessage)
+					return &AgentResult[T]{
+						Data:     nil,
+						Messages: state.Messages,
+					}, ErrLimitReached
+				}
 				return nil, fmt.Errorf("%w: %s", ErrToolError, err)
 			}
 			llmMessage.ToolResults = results
@@ -236,6 +250,12 @@ func (a *Agent[T]) callTools(llmMessage llm.LLMMessage, usage map[string]int) ([
 		if !ok {
 			return nil, fmt.Errorf("%w: %s", ErrToolNotFound, toolCall.ToolName)
 		}
+		
+		limit := a.getToolLimit(toolCall.ToolName)
+		if usage[toolCall.ToolName] >= limit {
+			return nil, ErrLimitReached
+		}
+		
 		toolRes, err := tool.Call(toolCall.ID, toolCall.Args)
 		if err != nil {
 			return nil, fmt.Errorf("%w: %s", ErrToolError, err)
@@ -270,12 +290,3 @@ func (a *Agent[T]) createResult(state *AgentState) (*AgentResult[T], error) {
 	}, nil
 }
 
-func (a *Agent[T]) isLimitReached(usage map[string]int) bool {
-	limitReached := make(map[string]bool)
-	for toolName, limit := range a.limits {
-		if usage, exists := usage[toolName]; exists && usage >= limit {
-			limitReached[toolName] = true
-		}
-	}
-	return len(limitReached) == len(a.limits)
-}

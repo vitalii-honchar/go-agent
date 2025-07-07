@@ -158,6 +158,236 @@ You MUST use the add tool for each increment. Do NOT calculate manually.`),
 	t.Logf("📝 Steps taken: %+v", result.Data.Steps)
 }
 
+func TestToolLimitReached(t *testing.T) {
+	// given
+	toolCallCounter, addTool := createAddTool(t)
+
+	apiKey := os.Getenv("OPENAI_API_KEY")
+	require.NotEmpty(t, apiKey, "OPENAI_API_KEY environment variable must be set")
+
+	limitTestAgent, err := agent.NewAgent(
+		agent.WithName[IncrementResult]("limit-tester"),
+		agent.WithLLMConfig[IncrementResult](llm.LLMConfig{
+			Type:        llm.LLMTypeOpenAI,
+			APIKey:      apiKey,
+			Model:       "gpt-4.1",
+			Temperature: 0.0,
+		}),
+		agent.WithBehavior[IncrementResult](`You are a limit testing agent. You MUST call the add tool exactly 5 times in sequence:
+1. add(10, 2) 
+2. add(result, 2) 
+3. add(result, 2) 
+4. add(result, 2) 
+5. add(result, 2)
+
+You are required to make ALL 5 calls. Do not stop early. Continue calling add tool until you have made 5 total calls. 
+Track each step and return the final number.`),
+		agent.WithTool[IncrementResult]("add", addTool),
+		agent.WithToolLimit[IncrementResult]("add", 2),
+		agent.WithOutputSchema(&IncrementResult{}),
+	)
+	require.NoError(t, err)
+
+	input := IncrementInput{
+		StartNumber: 10,
+		Steps:       5,
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	t.Logf("🚀 Starting tool limit test: %d + 2 (x%d times) with limit of 3", input.StartNumber, input.Steps)
+
+	// when
+	result, err := limitTestAgent.Run(ctx, input)
+
+	// then
+	require.ErrorIs(t, err, agent.ErrLimitReached, "Agent should return ErrLimitReached")
+	require.NotNil(t, result, "Result should not be nil even when limit reached")
+	require.Nil(t, result.Data, "Result data should be nil when limit reached")
+	require.NotEmpty(t, result.Messages, "Result should contain conversation messages")
+
+	finalCount := atomic.LoadInt64(toolCallCounter)
+	assert.Equal(t, int64(2), finalCount, "Add tool should have been called exactly 2 times before hitting limit")
+
+	t.Logf("🔧 Tool called %d times (limit: 2)", finalCount)
+	t.Logf("✅ Limit reached as expected with error: %v", err)
+	t.Logf("📝 Messages count: %d", len(result.Messages))
+}
+
+func TestMultiToolLimitReached(t *testing.T) {
+	// given
+	addToolCallCounter, addTool := createAddTool(t)
+	hashToolCallCounter, hashTool := createHashTool(t)
+
+	apiKey := os.Getenv("OPENAI_API_KEY")
+	require.NotEmpty(t, apiKey, "OPENAI_API_KEY environment variable must be set")
+
+	multiToolAgent, err := agent.NewAgent(
+		agent.WithName[IncrementResult]("multi-tool-tester"),
+		agent.WithLLMConfig[IncrementResult](llm.LLMConfig{
+			Type:        llm.LLMTypeOpenAI,
+			APIKey:      apiKey,
+			Model:       "gpt-4.1",
+			Temperature: 0.0,
+		}),
+		agent.WithBehavior[IncrementResult](`You are a multi-tool testing agent. You must:
+1. Start with the provided start_number (10)
+2. Use the add tool exactly 3 times to add 2 each time: add(10,2), add(12,2), add(14,2) 
+3. Then use the hash tool to compute hash of "test"
+4. Track each step and return final number
+
+You have add tool limit of 3 and hash tool limit of 1. Use add tool 3 times, then hash tool 1 time.`),
+		agent.WithTool[IncrementResult]("add", addTool),
+		agent.WithTool[IncrementResult]("hash", hashTool),
+		agent.WithToolLimit[IncrementResult]("add", 3),
+		agent.WithToolLimit[IncrementResult]("hash", 1),
+		agent.WithOutputSchema(&IncrementResult{}),
+	)
+	require.NoError(t, err)
+
+	input := IncrementInput{
+		StartNumber: 10,
+		Steps:       3,
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	t.Logf("🚀 Starting multi-tool test: add limit=3, hash limit=1")
+
+	// when
+	result, err := multiToolAgent.Run(ctx, input)
+
+	// then
+	require.NoError(t, err, "Agent should complete successfully using both tools within limits")
+	require.NotNil(t, result, "Result should not be nil")
+	require.NotNil(t, result.Data, "Result data should not be nil")
+	require.NotEmpty(t, result.Messages, "Result should contain conversation messages")
+
+	addCallCount := atomic.LoadInt64(addToolCallCounter)
+	hashCallCount := atomic.LoadInt64(hashToolCallCounter)
+	
+	assert.Equal(t, int64(3), addCallCount, "Add tool should have been called exactly 3 times")
+	assert.Equal(t, int64(1), hashCallCount, "Hash tool should have been called exactly 1 time")
+	assert.Equal(t, 16, result.Data.FinalNumber, "Final number should be 16 (10+2+2+2)")
+
+	t.Logf("🔧 Add tool called %d times (limit: 3)", addCallCount)
+	t.Logf("🔧 Hash tool called %d times (limit: 1)", hashCallCount)
+	t.Logf("✅ Final result: %d", result.Data.FinalNumber)
+	t.Logf("📝 Messages count: %d", len(result.Messages))
+}
+
+func TestDefaultToolLimit(t *testing.T) {
+	// given
+	toolCallCounter, addTool := createAddTool(t)
+
+	apiKey := os.Getenv("OPENAI_API_KEY")
+	require.NotEmpty(t, apiKey, "OPENAI_API_KEY environment variable must be set")
+
+	// Agent with no explicit tool limits - should use default limit of 3
+	defaultLimitAgent, err := agent.NewAgent(
+		agent.WithName[IncrementResult]("default-limit-tester"),
+		agent.WithLLMConfig[IncrementResult](llm.LLMConfig{
+			Type:        llm.LLMTypeOpenAI,
+			APIKey:      apiKey,
+			Model:       "gpt-4.1",
+			Temperature: 0.0,
+		}),
+		agent.WithBehavior[IncrementResult](`You are a default limit testing agent. You must:
+1. Start with the provided start_number (5)
+2. Use the add tool to add 1 three times: add(5,1), add(6,1), add(7,1)
+3. Track each step and return final number
+
+Use the add tool exactly 3 times.`),
+		agent.WithTool[IncrementResult]("add", addTool),
+		// Note: No explicit tool limit set - should use default of 3
+		agent.WithOutputSchema(&IncrementResult{}),
+	)
+	require.NoError(t, err)
+
+	input := IncrementInput{
+		StartNumber: 5,
+		Steps:       3,
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	t.Logf("🚀 Starting default limit test: no explicit limit (should default to 3)")
+
+	// when
+	result, err := defaultLimitAgent.Run(ctx, input)
+
+	// then
+	require.NoError(t, err, "Agent should complete successfully with default limit")
+	require.NotNil(t, result, "Result should not be nil")
+	require.NotNil(t, result.Data, "Result data should not be nil")
+
+	finalCount := atomic.LoadInt64(toolCallCounter)
+	assert.Equal(t, int64(3), finalCount, "Add tool should have been called exactly 3 times (default limit)")
+	assert.Equal(t, 8, result.Data.FinalNumber, "Final number should be 8 (5+1+1+1)")
+
+	t.Logf("🔧 Tool called %d times (default limit: 3)", finalCount)
+	t.Logf("✅ Final result: %d", result.Data.FinalNumber)
+}
+
+func TestCustomDefaultToolLimit(t *testing.T) {
+	// given
+	toolCallCounter, addTool := createAddTool(t)
+
+	apiKey := os.Getenv("OPENAI_API_KEY")
+	require.NotEmpty(t, apiKey, "OPENAI_API_KEY environment variable must be set")
+
+	// Agent with custom default tool limit of 2
+	customDefaultAgent, err := agent.NewAgent(
+		agent.WithName[IncrementResult]("custom-default-tester"),
+		agent.WithLLMConfig[IncrementResult](llm.LLMConfig{
+			Type:        llm.LLMTypeOpenAI,
+			APIKey:      apiKey,
+			Model:       "gpt-4.1",
+			Temperature: 0.0,
+		}),
+		agent.WithBehavior[IncrementResult](`You are a custom default limit testing agent. You must:
+1. Start with the provided start_number (10)
+2. Use the add tool to add 5 exactly 2 times: add(10,5), add(15,5)
+3. Track each step and return final number
+
+Use the add tool exactly 2 times.`),
+		agent.WithTool[IncrementResult]("add", addTool),
+		agent.WithDefaultToolLimit[IncrementResult](2), // Custom default limit
+		// Note: No explicit tool limit set - should use custom default of 2
+		agent.WithOutputSchema(&IncrementResult{}),
+	)
+	require.NoError(t, err)
+
+	input := IncrementInput{
+		StartNumber: 10,
+		Steps:       2,
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	t.Logf("🚀 Starting custom default limit test: custom default limit of 2")
+
+	// when
+	result, err := customDefaultAgent.Run(ctx, input)
+
+	// then
+	require.NoError(t, err, "Agent should complete successfully with custom default limit")
+	require.NotNil(t, result, "Result should not be nil")
+	require.NotNil(t, result.Data, "Result data should not be nil")
+
+	finalCount := atomic.LoadInt64(toolCallCounter)
+	assert.Equal(t, int64(2), finalCount, "Add tool should have been called exactly 2 times (custom default limit)")
+	assert.Equal(t, 20, result.Data.FinalNumber, "Final number should be 20 (10+5+5)")
+
+	t.Logf("🔧 Tool called %d times (custom default limit: 2)", finalCount)
+	t.Logf("✅ Final result: %d", result.Data.FinalNumber)
+}
+
+
 type (
 	AddNumbers struct {
 		Num1 int `json:"num1"`
