@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/errors"
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
 )
@@ -12,6 +13,11 @@ import (
 const (
 	openAIFinishReasonStop   = "stop"
 	openAIFinishReasonLength = "length"
+)
+
+var (
+	ErrFailedToMarshalToolResult = errors.New("failed to marshal tool result")
+	ErrFailedToMarshalToolCall   = errors.New("failed to marshal tool call")
 )
 
 type openAILLM struct {
@@ -57,7 +63,11 @@ func newOpenAILLM(options ...openAILLMOption) *openAILLM {
 }
 
 func (o *openAILLM) Call(ctx context.Context, msgs []LLMMessage) (LLMMessage, error) {
-	params := o.createParameters(msgs)
+	params, err := o.createParameters(msgs)
+	if err != nil {
+		return LLMMessage{}, fmt.Errorf("failed to create OpenAI parameters: %w", err)
+	}
+
 	completion, err := o.client.Chat.Completions.New(ctx, params)
 	if err != nil {
 		return LLMMessage{}, fmt.Errorf("OpenAI API call failed: %w", err)
@@ -92,13 +102,18 @@ func (o *openAILLM) createLLMToolCalls(choice openai.ChatCompletionChoice) []LLM
 	return res
 }
 
-func (o *openAILLM) createParameters(messages []LLMMessage) openai.ChatCompletionNewParams {
+func (o *openAILLM) createParameters(messages []LLMMessage) (openai.ChatCompletionNewParams, error) {
+	openAIMessages, err := o.createMessages(messages)
+	if err != nil {
+		return openai.ChatCompletionNewParams{}, err
+	}
+
 	return openai.ChatCompletionNewParams{
-		Messages:    o.createMessages(messages),
+		Messages:    openAIMessages,
 		Model:       o.model,
 		Temperature: openai.Float(o.temperature),
 		Tools:       o.createToolParams(),
-	}
+	}, nil
 }
 
 func (o *openAILLM) createToolParams() []openai.ChatCompletionToolParam {
@@ -117,7 +132,7 @@ func (o *openAILLM) createToolParams() []openai.ChatCompletionToolParam {
 	return toolParams
 }
 
-func (o *openAILLM) createMessages(msgs []LLMMessage) []openai.ChatCompletionMessageParamUnion {
+func (o *openAILLM) createMessages(msgs []LLMMessage) ([]openai.ChatCompletionMessageParamUnion, error) {
 	openAIMessages := make([]openai.ChatCompletionMessageParamUnion, 0, len(msgs))
 
 	for _, msg := range msgs {
@@ -127,9 +142,40 @@ func (o *openAILLM) createMessages(msgs []LLMMessage) []openai.ChatCompletionMes
 		case LLMMessageTypeUser:
 			openAIMessages = append(openAIMessages, openai.UserMessage(msg.Content))
 		case LLMMessageTypeAssistant:
-			openAIMessages = append(openAIMessages, openai.AssistantMessage(msg.Content))
+			if len(msg.ToolCalls) > 0 {
+
+				messages, err := o.addToolResults(openAIMessages, msg)
+				if err != nil {
+					return nil, err
+				}
+				openAIMessages = messages
+			} else {
+				openAIMessages = append(openAIMessages, openai.AssistantMessage(msg.Content))
+			}
 		}
 	}
 
-	return openAIMessages
+	return openAIMessages, nil
+}
+
+func (o *openAILLM) addToolCalls(openAIMessages []openai.ChatCompletionMessageParamUnion, msg LLMMessage) ([]openai.ChatCompletionMessageParamUnion, error) {
+	for _, toolCall := range msg.ToolCalls {
+		toolCallJson, err := json.Marshal(toolCall)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %w", ErrFailedToMarshalToolCall, err)
+		}
+		openAIMessages = append(openAIMessages, openai.ToolMessage(string(toolCallJson), toolCall.GetID()))
+	}
+	return openAIMessages, nil
+}
+
+func (o *openAILLM) addToolResults(openAIMessages []openai.ChatCompletionMessageParamUnion, msg LLMMessage) ([]openai.ChatCompletionMessageParamUnion, error) {
+	for _, toolRes := range msg.ToolResults {
+		toolResJson, err := json.Marshal(toolRes)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %w", ErrFailedToMarshalToolResult, err)
+		}
+		openAIMessages = append(openAIMessages, openai.ToolMessage(string(toolResJson), toolRes.GetID()))
+	}
+	return openAIMessages, nil
 }
