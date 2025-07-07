@@ -1,4 +1,4 @@
-module go-agent
+module github.com/vitalii-honchar/go-agent
 
 go 1.24.4
 

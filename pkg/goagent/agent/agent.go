@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"go-agent/pkg/goagent/llm"
+	"github.com/vitalii-honchar/go-agent/pkg/goagent/llm"
 	"strings"
 
 	"github.com/invopop/jsonschema"

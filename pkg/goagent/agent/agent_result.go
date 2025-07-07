@@ -2,7 +2,7 @@ package agent
 
 import (
 	"fmt"
-	"go-agent/pkg/goagent/llm"
+	"github.com/vitalii-honchar/go-agent/pkg/goagent/llm"
 )
 
 // AgentResult represents the result of an agent execution
