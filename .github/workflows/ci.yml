@@ -19,8 +19,8 @@ jobs:
           uses: golangci/golangci-lint-action@v8
           with:
             version: v2.1
-  ci:
-    name: CI
+  tests:
+    name: test
     runs-on: ubuntu-latest
     env:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
