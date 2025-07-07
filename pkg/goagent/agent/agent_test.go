@@ -173,30 +173,36 @@ func TestToolLimitReached(t *testing.T) {
 			Model:       "gpt-4.1",
 			Temperature: 0.0,
 		}),
-		agent.WithBehavior[IncrementResult](`You are a limit testing agent. You MUST call the add tool exactly 5 times in sequence:
-1. add(10, 2) 
-2. add(result, 2) 
-3. add(result, 2) 
-4. add(result, 2) 
-5. add(result, 2)
+		agent.WithBehavior[IncrementResult](`You are a calculation agent that can ONLY perform arithmetic using the add tool. You have no ability to calculate numbers manually.
 
-You are required to make ALL 5 calls. Do not stop early. Continue calling add tool until you have made 5 total calls. 
-Track each step and return the final number.`),
+Your task: You need to increment the start_number by adding complex floating point numbers that you cannot calculate yourself.
+
+Process:
+1. Use add tool to add start_number + 0.12345
+2. Use add tool to add result + 0.23456  
+3. Use add tool to add result + 0.34567
+4. Use add tool to add result + 0.45678
+5. Use add tool to add result + 0.56789
+
+You MUST use the add tool for each step because these floating point calculations are too complex for you to do manually. 
+Do not try to calculate yourself - you will get wrong results. Always use the add tool.
+
+Continue making these precise floating point additions until you have made at least 3 tool calls.`),
 		agent.WithTool[IncrementResult]("add", addTool),
-		agent.WithToolLimit[IncrementResult]("add", 2),
+		agent.WithToolLimit[IncrementResult]("add", 1),
 		agent.WithOutputSchema(&IncrementResult{}),
 	)
 	require.NoError(t, err)
 
 	input := IncrementInput{
-		StartNumber: 10,
-		Steps:       5,
+		StartNumber: 100,
+		Steps:       3,
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	t.Logf("🚀 Starting tool limit test: %d + 2 (x%d times) with limit of 3", input.StartNumber, input.Steps)
+	t.Logf("🚀 Starting tool limit test: %d + floating point numbers (x%d times) with limit of 1", input.StartNumber, input.Steps)
 
 	// when
 	result, err := limitTestAgent.Run(ctx, input)
@@ -208,9 +214,9 @@ Track each step and return the final number.`),
 	require.NotEmpty(t, result.Messages, "Result should contain conversation messages")
 
 	finalCount := atomic.LoadInt64(toolCallCounter)
-	assert.Equal(t, int64(2), finalCount, "Add tool should have been called exactly 2 times before hitting limit")
+	assert.Equal(t, int64(1), finalCount, "Add tool should have been called exactly 1 time before hitting limit")
 
-	t.Logf("🔧 Tool called %d times (limit: 2)", finalCount)
+	t.Logf("🔧 Tool called %d times (limit: 1)", finalCount)
 	t.Logf("✅ Limit reached as expected with error: %v", err)
 	t.Logf("📝 Messages count: %d", len(result.Messages))
 }
