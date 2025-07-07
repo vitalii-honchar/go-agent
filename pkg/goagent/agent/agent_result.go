@@ -5,11 +5,13 @@ import (
 	"go-agent/pkg/goagent/llm"
 )
 
+// AgentResult represents the result of an agent execution
 type AgentResult[T any] struct {
 	Data     *T               `json:"data"`
 	Messages []llm.LLMMessage `json:"messages"`
 }
 
+// NewAgentResult creates a new AgentResult with the given data and messages
 func NewAgentResult[T any](data *T, messages []llm.LLMMessage) (*AgentResult[T], error) {
 	if data == nil {
 		return nil, fmt.Errorf("%w: data cannot be nil", ErrInvalidResultSchema)

@@ -16,7 +16,9 @@ const (
 )
 
 var (
+	// ErrFailedToMarshalToolResult is returned when tool result marshaling fails
 	ErrFailedToMarshalToolResult = errors.New("failed to marshal tool result")
+	// ErrFailedToMarshalToolCall is returned when tool call marshaling fails
 	ErrFailedToMarshalToolCall   = errors.New("failed to marshal tool call")
 )
 
@@ -195,11 +197,11 @@ func (o *openAILLM) addToolCalls(openAIMessages []openai.ChatCompletionMessagePa
 
 func (o *openAILLM) addToolResults(openAIMessages []openai.ChatCompletionMessageParamUnion, msg LLMMessage) ([]openai.ChatCompletionMessageParamUnion, error) {
 	for _, toolRes := range msg.ToolResults {
-		toolResJson, err := json.Marshal(toolRes)
+		toolResJSON, err := json.Marshal(toolRes)
 		if err != nil {
 			return nil, fmt.Errorf("%w: %w", ErrFailedToMarshalToolResult, err)
 		}
-		openAIMessages = append(openAIMessages, openai.ToolMessage(string(toolResJson), toolRes.GetID()))
+		openAIMessages = append(openAIMessages, openai.ToolMessage(string(toolResJSON), toolRes.GetID()))
 	}
 	return openAIMessages, nil
 }

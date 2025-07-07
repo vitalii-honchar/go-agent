@@ -1,3 +1,4 @@
+// Package config provides configuration management for the Go Agent library
 package config
 
 import (
@@ -9,10 +10,12 @@ import (
 	"github.com/joho/godotenv"
 )
 
+// Config represents the main configuration structure
 type Config struct {
 	OpenAI *OpenAIConfig
 }
 
+// OpenAIConfig contains OpenAI-specific configuration
 type OpenAIConfig struct {
 	APIKey      string
 	Model       string
@@ -21,6 +24,7 @@ type OpenAIConfig struct {
 	Timeout     time.Duration
 }
 
+// NewConfig creates a new Config instance with values from environment variables
 func NewConfig() *Config {
 	// Load environment variables from .env file
 	if err := godotenv.Load(); err != nil {

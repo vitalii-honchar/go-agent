@@ -1,3 +1,4 @@
+// Package agent provides AI agent functionality with configurable behavior, tools, and output schemas
 package agent
 
 import (
@@ -222,7 +223,7 @@ func (a *Agent[T]) createInitState(input any) (*AgentState, error) {
 		return nil, ErrEmptySystemPrompt
 	}
 
-	inputJson, err := json.Marshal(input)
+	inputJSON, err := json.Marshal(input)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal input: %w", err)
 	}
@@ -230,7 +231,7 @@ func (a *Agent[T]) createInitState(input any) (*AgentState, error) {
 	return &AgentState{
 		Messages: []llm.LLMMessage{
 			llm.NewLLMMessage(llm.LLMMessageTypeSystem, systemPrompt),
-			llm.NewLLMMessage(llm.LLMMessageTypeUser, string(inputJson)),
+			llm.NewLLMMessage(llm.LLMMessageTypeUser, string(inputJSON)),
 		},
 	}, nil
 }

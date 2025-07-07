@@ -1,3 +1,4 @@
+// Package llm provides LLM abstractions and implementations for the Go Agent library
 package llm
 
 import (
@@ -5,12 +6,15 @@ import (
 	"fmt"
 )
 
+// ErrUnsupportedLLMType is returned when an unsupported LLM type is specified
 var ErrUnsupportedLLMType = fmt.Errorf("unsupported LLM type")
 
+// LLM represents a language model interface
 type LLM interface {
 	Call(ctx context.Context, msgs []LLMMessage) (LLMMessage, error)
 }
 
+// CreateLLM creates a new LLM instance based on the configuration
 func CreateLLM(cfg LLMConfig, tools map[string]LLMTool) (LLM, error) {
 	switch cfg.Type {
 	case LLMTypeOpenAI:

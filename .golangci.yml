@@ -11,4 +11,3 @@ linters:
     - staticcheck   # Advanced static analysis (default)
     - unused        # Check for unused code (default)
     - misspell      # Check for misspellings
-    - revive        # Fast, configurable linter
