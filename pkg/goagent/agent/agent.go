@@ -13,13 +13,21 @@ import (
 )
 
 var (
+	// ErrLimitReached is returned when a tool usage limit is exceeded
 	ErrLimitReached        = errors.New("tool limit reached")
+	// ErrToolError is returned when a tool call fails
 	ErrToolError           = errors.New("tool error occurred")
+	// ErrLLMCall is returned when an LLM call fails
 	ErrLLMCall             = errors.New("LLM call error occurred")
+	// ErrFinish is returned when LLM execution is finished
 	ErrFinish              = errors.New("LLM finished execution")
+	// ErrToolNotFound is returned when a requested tool is not found
 	ErrToolNotFound        = errors.New("tool not found")
+	// ErrInvalidResultSchema is returned when result validation fails
 	ErrInvalidResultSchema = errors.New("invalid result schema")
+	// ErrCannotCreateSchema is returned when schema creation fails
 	ErrCannotCreateSchema  = errors.New("cannot create schema from output type")
+	// ErrEmptySystemPrompt is returned when system prompt is empty
 	ErrEmptySystemPrompt   = errors.New("system prompt cannot be empty")
 )
 
@@ -43,6 +51,7 @@ OUTPUT SCHEMA:
 </BEHAVIOR>
 `)
 
+// Agent represents a configurable AI agent with tools and behavior
 type Agent[T any] struct {
 	name             string
 	llm              llm.LLM
@@ -56,8 +65,10 @@ type Agent[T any] struct {
 	schemaLoader     gojsonschema.JSONLoader
 }
 
+// AgentOption is a function that configures an Agent
 type AgentOption[T any] func(*Agent[T])
 
+// NewAgent creates a new Agent with the given options
 func NewAgent[T any](options ...AgentOption[T]) (*Agent[T], error) {
 	agent := &Agent[T]{
 		tools:            make(map[string]llm.LLMTool),
@@ -78,24 +89,28 @@ func NewAgent[T any](options ...AgentOption[T]) (*Agent[T], error) {
 	return agent, nil
 }
 
+// WithName sets the agent's name
 func WithName[T any](name string) AgentOption[T] {
 	return func(a *Agent[T]) {
 		a.name = name
 	}
 }
 
+// WithLLMConfig sets the LLM configuration for the agent
 func WithLLMConfig[T any](config llm.LLMConfig) AgentOption[T] {
 	return func(a *Agent[T]) {
 		a.llmConfig = config
 	}
 }
 
+// WithBehavior sets the agent's behavior description
 func WithBehavior[T any](behavior string) AgentOption[T] {
 	return func(a *Agent[T]) {
 		a.behavior = strings.TrimSpace(behavior)
 	}
 }
 
+// WithOutputSchema sets the expected output schema for the agent
 func WithOutputSchema[T any](schema *T) AgentOption[T] {
 	return func(a *Agent[T]) {
 		a.outputSchema = schema
@@ -108,45 +123,53 @@ func WithOutputSchema[T any](schema *T) AgentOption[T] {
 	}
 }
 
+// WithSystemPrompt sets a custom system prompt template
 func WithSystemPrompt[T any](prompt Prompt) AgentOption[T] {
 	return func(a *Agent[T]) {
 		a.systemPrompt = prompt
 	}
 }
 
+// WithTool adds a tool to the agent
 func WithTool[T any](name string, tool llm.LLMTool) AgentOption[T] {
 	return func(a *Agent[T]) {
 		a.tools[name] = tool
 	}
 }
 
+// WithToolLimit sets a usage limit for a specific tool
 func WithToolLimit[T any](name string, limit int) AgentOption[T] {
 	return func(a *Agent[T]) {
 		a.limits[name] = limit
 	}
 }
 
+// WithDefaultToolLimit sets the default tool usage limit for all tools
 func WithDefaultToolLimit[T any](limit int) AgentOption[T] {
 	return func(a *Agent[T]) {
 		a.defaultToolLimit = limit
 	}
 }
 
+// AgentState represents the current state of agent execution
 type AgentState struct {
 	Messages []llm.LLMMessage
 }
 
+// AddMessage adds a message to the agent's conversation history
 func (a *AgentState) AddMessage(msg llm.LLMMessage) {
 	a.Messages = append(a.Messages, msg)
 }
 
-func (a *Agent[T]) getToolLimit(name string) int {
+// GetToolLimit returns the usage limit for a specific tool
+func (a *Agent[T]) GetToolLimit(name string) int {
 	if limit, exists := a.limits[name]; exists {
 		return limit
 	}
 	return a.defaultToolLimit
 }
 
+// Run executes the agent with the given input and returns the result
 func (a *Agent[T]) Run(ctx context.Context, input any) (*AgentResult[T], error) {
 	state, err := a.createInitState(input)
 	if err != nil {
@@ -251,7 +274,7 @@ func (a *Agent[T]) callTools(llmMessage llm.LLMMessage, usage map[string]int) ([
 			return nil, fmt.Errorf("%w: %s", ErrToolNotFound, toolCall.ToolName)
 		}
 		
-		limit := a.getToolLimit(toolCall.ToolName)
+		limit := a.GetToolLimit(toolCall.ToolName)
 		if usage[toolCall.ToolName] >= limit {
 			return nil, ErrLimitReached
 		}

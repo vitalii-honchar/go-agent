@@ -1,0 +1,14 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  enable:
+    - errcheck      # Check for unchecked errors (default)
+    - govet         # Go vet built-in (default)
+    - ineffassign   # Detect ineffectual assignments (default)
+    - staticcheck   # Advanced static analysis (default)
+    - unused        # Check for unused code (default)
+    - misspell      # Check for misspellings
+    - revive        # Fast, configurable linter
