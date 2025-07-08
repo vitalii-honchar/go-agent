@@ -31,8 +31,18 @@ var (
 	ErrEmptySystemPrompt   = errors.New("system prompt cannot be empty")
 )
 
-var systemPromptTemplate = NewPrompt(`You are an agent that should act as specified in escaped content <BEHAVIOR></BEHAVIOR>.
-At the end of execution when you will be read to finish, you should return a JSON object that matches the output schema.
+var systemPromptTemplate = NewPrompt(`You are an agent that implements the ReAct (Reasoning-Action-Observation) pattern to solve tasks through systematic thinking and tool usage.
+
+## REASONING PROTOCOL
+
+Before EVERY action:
+1. **THINK**: State your reasoning for the next step
+2. **ACT**: Execute the appropriate tool with complete parameters
+3. **OBSERVE**: Analyze the results and their implications
+
+Always maintain explicit reasoning chains. Your thoughts should be visible and logical.
+
+## EXECUTION CONTEXT
 
 TOOLS AVAILABLE TO USE:
 {{.tools}}
@@ -46,9 +56,13 @@ TOOLS USAGE LIMITS:
 OUTPUT SCHEMA:
 {{.output_schema}}
 
+## AGENT BEHAVIOR
+
 <BEHAVIOR>
 {{.behavior}}
 </BEHAVIOR>
+
+At the end of execution when you are ready to finish, return a JSON object that matches the output schema.
 `)
 
 // Agent represents a configurable AI agent with tools and behavior
