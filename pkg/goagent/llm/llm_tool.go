@@ -1,9 +1,17 @@
 package llm
 
-import "errors"
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
 
-// ErrInvalidArguments is returned when tool arguments are invalid
-var ErrInvalidArguments = errors.New("invalid arguments")
+	"github.com/invopop/jsonschema"
+)
+
+var (
+	// ErrInvalidArguments is returned when tool arguments are invalid
+	ErrInvalidArguments = errors.New("invalid arguments")
+)
 
 // LLMTool represents a tool that can be called by an LLM
 type LLMTool struct {
@@ -39,10 +47,39 @@ func WithLLMToolDescription(description string) LLMToolOption {
 	}
 }
 
-// WithLLMToolParametersSchema sets the parameters schema for the tool
-func WithLLMToolParametersSchema(schema map[string]any) LLMToolOption {
+// WithLLMToolParametersSchema sets the parameters schema from a Go type
+func WithLLMToolParametersSchema[T any](paramType *T) LLMToolOption {
 	return func(tool *LLMTool) {
-		tool.ParametersSchema = schema
+		// Generate schema from Go type
+		reflectedSchema := jsonschema.Reflect(paramType)
+		schemaBytes, err := json.Marshal(reflectedSchema)
+		if err != nil {
+			return
+		}
+		
+		// Convert to map for processing
+		var schemaMap map[string]any
+		if err := json.Unmarshal(schemaBytes, &schemaMap); err != nil {
+			return
+		}
+		
+		// Extract the actual object definition from $defs
+		// The jsonschema.Reflect creates a schema with $ref and $defs
+		// We need to extract the actual object schema for OpenAI
+		if defs, ok := schemaMap["$defs"].(map[string]any); ok {
+			for _, def := range defs {
+				if defMap, ok := def.(map[string]any); ok {
+					if defMap["type"] == "object" {
+						// Use the actual object definition
+						tool.ParametersSchema = defMap
+						return
+					}
+				}
+			}
+		}
+		
+		// Fallback: use the schema as-is if no $defs found
+		tool.ParametersSchema = schemaMap
 	}
 }
 
@@ -51,6 +88,30 @@ func WithLLMToolCall[T LLMToolResult](callFunc func(id string, args map[string]a
 	return func(tool *LLMTool) {
 		tool.Call = func(id string, args map[string]any) (LLMToolResult, error) {
 			result, err := callFunc(id, args)
+			if err != nil {
+				return nil, err
+			}
+			return result, nil
+		}
+	}
+}
+
+// WithLLMToolCallTyped sets the call function for the tool with typed parameters
+func WithLLMToolCallTyped[P any, T LLMToolResult](callFunc func(id string, params P) (T, error)) LLMToolOption {
+	return func(tool *LLMTool) {
+		tool.Call = func(id string, args map[string]any) (LLMToolResult, error) {
+			// Marshal args to JSON and unmarshal to typed params
+			argsBytes, err := json.Marshal(args)
+			if err != nil {
+				return nil, fmt.Errorf("%w: failed to marshal arguments: %v", ErrInvalidArguments, err)
+			}
+			
+			var params P
+			if err := json.Unmarshal(argsBytes, &params); err != nil {
+				return nil, fmt.Errorf("%w: failed to unmarshal arguments: %v", ErrInvalidArguments, err)
+			}
+			
+			result, err := callFunc(id, params)
 			if err != nil {
 				return nil, err
 			}
@@ -88,4 +149,14 @@ func NewLLMToolCall(id string, toolName string, args map[string]any) LLMToolCall
 		ToolName: toolName,
 		Args:     args,
 	}
+}
+
+// NewLLMToolTyped creates a new LLM tool with typed parameters (recommended approach)
+func NewLLMToolTyped[P any, T LLMToolResult](name, description string, paramType *P, callFunc func(id string, params P) (T, error)) LLMTool {
+	return NewLLMTool(
+		WithLLMToolName(name),
+		WithLLMToolDescription(description),
+		WithLLMToolParametersSchema(paramType),
+		WithLLMToolCallTyped(callFunc),
+	)
 }

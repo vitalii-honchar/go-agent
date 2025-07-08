@@ -433,72 +433,57 @@ type (
 	}
 )
 
+type AddToolParams struct {
+	Num1 float64 `json:"num1"`
+	Num2 float64 `json:"num2"`
+}
+
 func createAddTool(t *testing.T) (*int64, llm.LLMTool) {
 	counter := new(int64)
 
-	return counter, llm.NewLLMTool(
-		llm.WithLLMToolName("add"),
-		llm.WithLLMToolDescription("Adds two numbers together"),
-		llm.WithLLMToolParametersSchema(map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"num1": map[string]any{"type": "number"},
-				"num2": map[string]any{"type": "number"},
-			},
-			"required": []string{"num1", "num2"},
-		}),
-		llm.WithLLMToolCall(func(id string, args map[string]any) (AddToolResult, error) {
+	return counter, llm.NewLLMToolTyped(
+		"add",
+		"Adds two numbers together",
+		&AddToolParams{},
+		func(id string, params AddToolParams) (AddToolResult, error) {
 			callCount := atomic.AddInt64(counter, 1)
-			t.Logf("🔧 TOOL CALL #%d: add(num1=%v, num2=%v)", callCount, args["num1"], args["num2"])
+			t.Logf("🔧 TOOL CALL #%d: add(num1=%v, num2=%v)", callCount, params.Num1, params.Num2)
 
-			num1, ok1 := args["num1"].(float64)
-			num2, ok2 := args["num2"].(float64)
-
-			if !ok1 || !ok2 {
-				return AddToolResult{}, fmt.Errorf("%w: num1 = '%v', num2 = '%v'", llm.ErrInvalidArguments, num1, num2)
-			}
 			result := AddToolResult{
 				BaseLLMToolResult: llm.BaseLLMToolResult{
 					ID: id,
 				},
-				Sum: num1 + num2,
+				Sum: params.Num1 + params.Num2,
 			}
-			t.Logf("🔧 TOOL RESULT #%d: add(num1=%v, num2=%v) = %v", callCount, num1, num2, result.Sum)
+			t.Logf("🔧 TOOL RESULT #%d: add(num1=%v, num2=%v) = %v", callCount, params.Num1, params.Num2, result.Sum)
 			return result, nil
-		}),
+		},
 	)
+}
+
+type HashToolParams struct {
+	Input string `json:"input"`
 }
 
 func createHashTool(t *testing.T) (*int64, llm.LLMTool) {
 	counter := new(int64)
 
-	return counter, llm.NewLLMTool(
-		llm.WithLLMToolName("hash"),
-		llm.WithLLMToolDescription("Computes SHA256 hash of input string"),
-		llm.WithLLMToolParametersSchema(map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"input": map[string]any{"type": "string"},
-			},
-			"required": []string{"input"},
-		}),
-		llm.WithLLMToolCall(func(id string, args map[string]any) (HashToolResult, error) {
+	return counter, llm.NewLLMToolTyped(
+		"hash",
+		"Computes SHA256 hash of input string",
+		&HashToolParams{},
+		func(id string, params HashToolParams) (HashToolResult, error) {
 			callCount := atomic.AddInt64(counter, 1)
-			t.Logf("🔧 TOOL CALL #%d: hash(input='%s')", callCount, args["input"])
-
-			input, ok := args["input"].(string)
-			if !ok {
-				return HashToolResult{}, fmt.Errorf("%w: input must be string", llm.ErrInvalidArguments)
-			}
+			t.Logf("🔧 TOOL CALL #%d: hash(input='%s')", callCount, params.Input)
 
 			// This would be impossible for LLM to compute manually
-			hash := fmt.Sprintf("%x", []byte(input)) // Simple hex encoding as demo
-			t.Logf("🔧 TOOL RESULT #%d: hash(input='%s') = %s", callCount, input, hash)
+			hash := fmt.Sprintf("%x", []byte(params.Input)) // Simple hex encoding as demo
+			t.Logf("🔧 TOOL RESULT #%d: hash(input='%s') = %s", callCount, params.Input, hash)
 
 			return HashToolResult{
 				BaseLLMToolResult: llm.BaseLLMToolResult{ID: id},
 				Hash:              hash,
 			}, nil
-		}),
+		},
 	)
 }

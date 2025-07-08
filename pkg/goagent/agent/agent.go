@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/invopop/jsonschema"
-	"github.com/xeipuuv/gojsonschema"
 )
 
 var (
@@ -63,7 +62,6 @@ type Agent[T any] struct {
 	outputSchema     *T
 	systemPrompt     Prompt
 	behavior         string
-	schemaLoader     gojsonschema.JSONLoader
 }
 
 // AgentOption is a function that configures an Agent
@@ -115,12 +113,6 @@ func WithBehavior[T any](behavior string) AgentOption[T] {
 func WithOutputSchema[T any](schema *T) AgentOption[T] {
 	return func(a *Agent[T]) {
 		a.outputSchema = schema
-		// Pre-compile schema for validation
-		reflectedSchema := jsonschema.Reflect(schema)
-		schemaBytes, err := json.Marshal(reflectedSchema)
-		if err == nil {
-			a.schemaLoader = gojsonschema.NewStringLoader(string(schemaBytes))
-		}
 	}
 }
 
@@ -292,20 +284,10 @@ func (a *Agent[T]) callTools(llmMessage llm.LLMMessage, usage map[string]int) ([
 }
 
 func (a *Agent[T]) createResult(state *AgentState) (*AgentResult[T], error) {
-	dataLoader := gojsonschema.NewStringLoader(state.Messages[len(state.Messages)-1].Content)
-	validationRes, err := gojsonschema.Validate(a.schemaLoader, dataLoader)
-
-	if err != nil {
-		return nil, fmt.Errorf("%w: %s", ErrInvalidResultSchema, err)
-	}
-	if !validationRes.Valid() {
-		return nil, fmt.Errorf("%w: %s", ErrInvalidResultSchema, validationRes.Errors())
-	}
-
 	var data T
 
 	if err := json.Unmarshal([]byte(state.Messages[len(state.Messages)-1].Content), &data); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %s", ErrInvalidResultSchema, err)
 	}
 
 	return &AgentResult[T]{

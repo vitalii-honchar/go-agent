@@ -144,3 +144,13 @@ The project is in active development with the following features implemented:
    ```
 
 **Note:** Tests will fail without proper environment variables as they make real API calls to OpenAI.
+
+## Breaking Changes Policy
+
+**Don't worry about breaking changes** - this is an early-stage library and we prioritize developer experience over backward compatibility. Breaking changes will be made when they improve the API, and we'll bump the version appropriately for releases.
+
+Recent breaking changes include:
+- Removed `gojsonschema` dependency and validation from tools
+- Updated `WithLLMToolParametersSchema` to use Go types instead of manual `map[string]any` 
+- Added `NewLLMToolTyped` for better type safety
+- Simplified tool creation with automatic schema generation from Go types
