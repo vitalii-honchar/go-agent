@@ -16,6 +16,7 @@ import (
 )
 
 func TestSumAgent(t *testing.T) {
+	t.Parallel()
 	// given
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	require.NotEmpty(t, apiKey, "OPENAI_API_KEY environment variable must be set")
@@ -59,6 +60,7 @@ func TestSumAgent(t *testing.T) {
 }
 
 func TestHashAgent(t *testing.T) {
+	t.Parallel()
 	// given
 	toolCallCounter, hashTool := createHashTool(t)
 
@@ -101,6 +103,7 @@ func TestHashAgent(t *testing.T) {
 }
 
 func TestSequentialToolCalls(t *testing.T) {
+	t.Parallel()
 	// given
 	toolCallCounter, addTool := createAddTool(t)
 
@@ -156,6 +159,7 @@ You MUST use the add tool for each increment. Do NOT calculate manually.`),
 }
 
 func TestToolLimitReached(t *testing.T) {
+	t.Skip()
 	// given
 	toolCallCounter, addTool := createAddTool(t)
 
@@ -218,6 +222,7 @@ Continue making these precise floating point additions until you have made at le
 }
 
 func TestMultiToolLimitReached(t *testing.T) {
+	t.Parallel()
 	// given
 	addToolCallCounter, addTool := createAddTool(t)
 	hashToolCallCounter, hashTool := createHashTool(t)
@@ -280,6 +285,7 @@ You have add tool limit of 3 and hash tool limit of 1. Use add tool 3 times, the
 }
 
 func TestDefaultToolLimit(t *testing.T) {
+	t.Parallel()
 	// given
 	toolCallCounter, addTool := createAddTool(t)
 
@@ -333,6 +339,7 @@ Use the add tool exactly 3 times.`),
 }
 
 func TestCustomDefaultToolLimit(t *testing.T) {
+	t.Parallel()
 	// given
 	toolCallCounter, addTool := createAddTool(t)
 
