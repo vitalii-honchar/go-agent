@@ -28,6 +28,7 @@ func NewLLMTool(options ...LLMToolOption) LLMTool {
 	for _, opt := range options {
 		opt(tool)
 	}
+
 	return *tool
 }
 
@@ -64,6 +65,7 @@ func WithLLMToolCall[P any, T LLMToolResult](callFunc func(id string, args P) (T
 			if err != nil {
 				return nil, err
 			}
+
 			return result, nil
 		}
 	}

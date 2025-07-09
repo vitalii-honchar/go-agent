@@ -83,6 +83,7 @@ func TestHashAgent(t *testing.T) {
 	require.NoError(t, err)
 
 	input := HashInput{Text: "hello world"}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -96,7 +97,7 @@ func TestHashAgent(t *testing.T) {
 
 	// Verify tool was called
 	finalCount := atomic.LoadInt64(toolCallCounter)
-	assert.Greater(t, finalCount, int64(0), "Hash tool should have been called")
+	assert.Positive(t, finalCount, "Hash tool should have been called")
 
 	t.Logf("🔧 Hash tool called %d times", finalCount)
 	t.Logf("✅ Hash result: %s", result.Data.Hash)
@@ -405,21 +406,23 @@ type (
 
 	AddToolResult struct {
 		llm.BaseLLMToolResult
+
 		Sum float64 `json:"sum" jsonschema_description:"Sum of the two numbers"`
 	}
 
 	IncrementInput struct {
 		StartNumber int `json:"start_number" jsonschema_description:"Starting number for increment"`
-		Steps       int `json:"steps" jsonschema_description:"Number of steps to increment"`
+		Steps       int `json:"steps"        jsonschema_description:"Number of steps to increment"`
 	}
 
 	IncrementResult struct {
 		FinalNumber int      `json:"final_number" jsonschema_description:"Final result after all increments"`
-		Steps       []string `json:"steps" jsonschema_description:"List of steps taken to reach the final number"`
+		Steps       []string `json:"steps"        jsonschema_description:"List of steps taken to reach the final number"`
 	}
 
 	HashToolResult struct {
 		llm.BaseLLMToolResult
+
 		Hash string `json:"hash" jsonschema_description:"SHA256 hash of the input text"`
 	}
 
@@ -444,7 +447,7 @@ func createAddTool(t *testing.T) (*int64, llm.LLMTool) {
 		llm.WithLLMToolName("add"),
 		llm.WithLLMToolDescription("Adds two numbers together"),
 		llm.WithLLMToolParametersSchema[AddToolParams](),
-		llm.WithLLMToolCall[AddToolParams, AddToolResult](func(id string, params AddToolParams) (AddToolResult, error) {
+		llm.WithLLMToolCall(func(id string, params AddToolParams) (AddToolResult, error) {
 			callCount := atomic.AddInt64(counter, 1)
 			t.Logf("🔧 TOOL CALL #%d: add(num1=%v, num2=%v)", callCount, params.Num1, params.Num2)
 
@@ -455,6 +458,7 @@ func createAddTool(t *testing.T) (*int64, llm.LLMTool) {
 				Sum: params.Num1 + params.Num2,
 			}
 			t.Logf("🔧 TOOL RESULT #%d: add(num1=%v, num2=%v) = %v", callCount, params.Num1, params.Num2, result.Sum)
+
 			return result, nil
 		}),
 	)

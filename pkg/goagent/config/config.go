@@ -51,8 +51,10 @@ func getEnvStr(envVar string, defaultValue string) string {
 		if defaultValue == "" {
 			log.Fatalf("environment variable cannot be empty and no default provided: %s", envVar)
 		}
+
 		return defaultValue
 	}
+
 	return v
 }
 
@@ -67,6 +69,7 @@ func getEnvInt(envVar string, defaultValue int) int {
 	if err != nil {
 		log.Fatalf("environment variable must be an integer: name = %s, value = %s", envVar, v)
 	}
+
 	return i
 }
 
@@ -81,5 +84,6 @@ func getEnvFloat(envVar string, defaultValue float64) float64 {
 	if err != nil {
 		log.Fatalf("environment variable must be a float: name = %s, value = %s", envVar, v)
 	}
+
 	return f
 }

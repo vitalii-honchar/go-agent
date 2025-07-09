@@ -100,6 +100,7 @@ func NewAgent[T any](options ...AgentOption[T]) (*Agent[T], error) {
 	if err != nil {
 		return nil, err
 	}
+
 	agent.llm = agentLLM
 	agent.outputSchema = new(T)
 
@@ -170,6 +171,7 @@ func (a *Agent[T]) GetToolLimit(name string) int {
 	if limit, exists := a.limits[name]; exists {
 		return limit
 	}
+
 	return a.defaultToolLimit
 }
 
@@ -179,6 +181,7 @@ func (a *Agent[T]) Run(ctx context.Context, input any) (*AgentResult[T], error) 
 	if err != nil {
 		return nil, err
 	}
+
 	usage := make(map[string]int)
 
 	for {
@@ -192,13 +195,16 @@ func (a *Agent[T]) Run(ctx context.Context, input any) (*AgentResult[T], error) 
 			if err != nil {
 				if errors.Is(err, ErrLimitReached) {
 					state.AddMessage(llmMessage)
+
 					return &AgentResult[T]{
 						Data:     nil,
 						Messages: state.Messages,
 					}, ErrLimitReached
 				}
+
 				return nil, fmt.Errorf("%w: %s", ErrToolError, err)
 			}
+
 			llmMessage.ToolResults = results
 		}
 
@@ -212,6 +218,7 @@ func (a *Agent[T]) Run(ctx context.Context, input any) (*AgentResult[T], error) 
 		if err != nil {
 			return nil, fmt.Errorf("failed to update system prompt: %w", err)
 		}
+
 		state.Messages[0].Content = newSystemPrompt
 	}
 }
@@ -265,6 +272,7 @@ func (a *Agent[T]) createSystemPrompt(usage map[string]int) (string, error) {
 
 func (a *Agent[T]) callTools(llmMessage llm.LLMMessage, usage map[string]int) ([]llm.LLMToolResult, error) {
 	var results []llm.LLMToolResult
+
 	for _, toolCall := range llmMessage.ToolCalls {
 		tool, ok := a.tools[toolCall.ToolName]
 		if !ok {
@@ -280,7 +288,9 @@ func (a *Agent[T]) callTools(llmMessage llm.LLMMessage, usage map[string]int) ([
 		if err != nil {
 			return nil, fmt.Errorf("%w: %s", ErrToolError, err)
 		}
+
 		usage[toolCall.ToolName]++
+
 		results = append(results, toolRes)
 	}
 

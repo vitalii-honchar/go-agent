@@ -21,13 +21,14 @@ type LLM interface {
 // Call the LLM with structured output
 func CallWithStructuredOutput[T any](ctx context.Context, llm LLM, msgs []LLMMessage) (T, error) {
 	var result T
+
 	output, err := llm.CallWithStructuredOutput(ctx, msgs, new(T))
 	if err != nil {
-		return result, fmt.Errorf("%w: %s", ErrStructuredOutput, err)
+		return result, fmt.Errorf("%w: %w", ErrStructuredOutput, err)
 	}
 
 	if err := json.Unmarshal([]byte(output), &result); err != nil {
-		return result, fmt.Errorf("%w: %s", ErrStructuredOutput, err)
+		return result, fmt.Errorf("%w: %w", ErrStructuredOutput, err)
 	}
 
 	return result, nil
@@ -52,9 +53,11 @@ func toSlice(tools map[string]LLMTool) []LLMTool {
 	if len(tools) == 0 {
 		return nil
 	}
+
 	slice := make([]LLMTool, 0, len(tools))
 	for _, tool := range tools {
 		slice = append(slice, tool)
 	}
+
 	return slice
 }

@@ -22,6 +22,8 @@ var (
 	ErrFailedToMarshalToolResult = errors.New("failed to marshal tool result")
 	// ErrFailedToMarshalToolCall is returned when tool call marshaling fails
 	ErrFailedToMarshalToolCall = errors.New("failed to marshal tool call")
+	// ErrNoResponseFromOpenAI is returned when OpenAI returns no response
+	ErrNoResponseFromOpenAI = errors.New("no response from OpenAI")
 )
 
 type openAILLM struct {
@@ -63,6 +65,7 @@ func newOpenAILLM(options ...openAILLMOption) *openAILLM {
 	for _, opt := range options {
 		opt(llm)
 	}
+
 	return llm
 }
 
@@ -80,6 +83,7 @@ func (o *openAILLM) CallWithStructuredOutput(ctx context.Context, msgs []LLMMess
 	if err != nil {
 		return "", err
 	}
+
 	return choice.Message.Content, nil
 }
 
@@ -95,8 +99,9 @@ func (o *openAILLM) callLLM(ctx context.Context, msgs []LLMMessage, schemaT any)
 	}
 
 	if len(completion.Choices) == 0 {
-		return openai.ChatCompletionChoice{}, fmt.Errorf("no response from OpenAI")
+		return openai.ChatCompletionChoice{}, ErrNoResponseFromOpenAI
 	}
+
 	return completion.Choices[0], nil
 }
 
@@ -114,6 +119,7 @@ func (o *openAILLM) createLLMToolCalls(choice openai.ChatCompletionChoice) []LLM
 	for _, toolCall := range choice.Message.ToolCalls {
 		res = append(res, NewLLMToolCall(toolCall.ID, toolCall.Function.Name, toolCall.Function.Arguments))
 	}
+
 	return res
 }
 
@@ -193,6 +199,7 @@ func (o *openAILLM) createMessages(msgs []LLMMessage) ([]openai.ChatCompletionMe
 				if err != nil {
 					return nil, err
 				}
+
 				openAIMessages = messages
 
 				// Then add tool results if any
@@ -201,6 +208,7 @@ func (o *openAILLM) createMessages(msgs []LLMMessage) ([]openai.ChatCompletionMe
 					if err != nil {
 						return nil, err
 					}
+
 					openAIMessages = messages
 				}
 			} else {
@@ -244,7 +252,9 @@ func (o *openAILLM) addToolResults(openAIMessages []openai.ChatCompletionMessage
 		if err != nil {
 			return nil, fmt.Errorf("%w: %w", ErrFailedToMarshalToolResult, err)
 		}
+
 		openAIMessages = append(openAIMessages, openai.ToolMessage(string(toolResJSON), toolRes.GetID()))
 	}
+
 	return openAIMessages, nil
 }

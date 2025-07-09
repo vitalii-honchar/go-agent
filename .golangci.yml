@@ -11,3 +11,37 @@ linters:
     - staticcheck   # Advanced static analysis (default)
     - unused        # Check for unused code (default)
     - misspell      # Check for misspellings
+    - err113
+    - errname
+    - funlen
+    - funcorder
+    - gochecknoinits
+    - gocognit
+    - goconst
+    - gocritic
+    - gosec
+    - iface
+    - lll
+    - interfacebloat
+    - musttag
+    - nestif
+    - nilerr
+    - nlreturn
+    - noctx
+    - paralleltest
+    - prealloc
+    - reassign
+    - sqlclosecheck
+    - tagalign
+    - testifylint
+    - testableexamples
+    - testpackage
+    - tparallel
+    - unconvert
+    - unparam
+    - usestdlibvars
+    - varnamelen
+    - wastedassign
+    - whitespace
+    - wrapcheck
+    - wsl_v5

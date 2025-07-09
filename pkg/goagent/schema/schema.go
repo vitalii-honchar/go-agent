@@ -18,7 +18,6 @@ var reflector = jsonschema.Reflector{
 // Generate a JSON schema from the Go type T
 func GenerateSchema(schemaT any) (map[string]any, error) {
 	schema, err := GenerateSchemaStr(schemaT)
-
 	if err != nil {
 		return nil, err
 	}
@@ -33,9 +32,11 @@ func GenerateSchema(schemaT any) (map[string]any, error) {
 
 func GenerateSchemaStr(schemaT any) (string, error) {
 	schema := reflector.Reflect(schemaT)
+
 	schemaMap, err := json.Marshal(schema)
 	if err != nil {
 		return "", fmt.Errorf("%w: %v", ErrCannotCreateSchema, err)
 	}
+
 	return string(schemaMap), nil
 }
