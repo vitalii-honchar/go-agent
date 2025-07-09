@@ -440,11 +440,11 @@ type AddToolParams struct {
 func createAddTool(t *testing.T) (*int64, llm.LLMTool) {
 	counter := new(int64)
 
-	return counter, llm.NewLLMToolTyped(
-		"add",
-		"Adds two numbers together",
-		&AddToolParams{},
-		func(id string, params AddToolParams) (AddToolResult, error) {
+	return counter, llm.NewLLMTool(
+		llm.WithLLMToolName("add"),
+		llm.WithLLMToolDescription("Adds two numbers together"),
+		llm.WithLLMToolParametersSchema[AddToolParams](),
+		llm.WithLLMToolCall[AddToolParams, AddToolResult](func(id string, params AddToolParams) (AddToolResult, error) {
 			callCount := atomic.AddInt64(counter, 1)
 			t.Logf("🔧 TOOL CALL #%d: add(num1=%v, num2=%v)", callCount, params.Num1, params.Num2)
 
@@ -456,7 +456,7 @@ func createAddTool(t *testing.T) (*int64, llm.LLMTool) {
 			}
 			t.Logf("🔧 TOOL RESULT #%d: add(num1=%v, num2=%v) = %v", callCount, params.Num1, params.Num2, result.Sum)
 			return result, nil
-		},
+		}),
 	)
 }
 
@@ -467,11 +467,11 @@ type HashToolParams struct {
 func createHashTool(t *testing.T) (*int64, llm.LLMTool) {
 	counter := new(int64)
 
-	return counter, llm.NewLLMToolTyped(
-		"hash",
-		"Computes SHA256 hash of input string",
-		&HashToolParams{},
-		func(id string, params HashToolParams) (HashToolResult, error) {
+	return counter, llm.NewLLMTool(
+		llm.WithLLMToolName("hash"),
+		llm.WithLLMToolDescription("Computes SHA256 hash of input string"),
+		llm.WithLLMToolParametersSchema[HashToolParams](),
+		llm.WithLLMToolCall[HashToolParams, HashToolResult](func(id string, params HashToolParams) (HashToolResult, error) {
 			callCount := atomic.AddInt64(counter, 1)
 			t.Logf("🔧 TOOL CALL #%d: hash(input='%s')", callCount, params.Input)
 
@@ -483,6 +483,6 @@ func createHashTool(t *testing.T) (*int64, llm.LLMTool) {
 				BaseLLMToolResult: llm.BaseLLMToolResult{ID: id},
 				Hash:              hash,
 			}, nil
-		},
+		}),
 	)
 }
