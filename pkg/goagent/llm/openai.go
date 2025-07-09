@@ -112,12 +112,7 @@ func (o *openAILLM) newLLMMessage(choice openai.ChatCompletionChoice) LLMMessage
 func (o *openAILLM) createLLMToolCalls(choice openai.ChatCompletionChoice) []LLMToolCall {
 	var res []LLMToolCall
 	for _, toolCall := range choice.Message.ToolCalls {
-		args := make(map[string]any)
-		if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &args); err != nil {
-			continue
-		}
-
-		res = append(res, NewLLMToolCall(toolCall.ID, toolCall.Function.Name, args))
+		res = append(res, NewLLMToolCall(toolCall.ID, toolCall.Function.Name, toolCall.Function.Arguments))
 	}
 	return res
 }
@@ -128,11 +123,16 @@ func (o *openAILLM) createParameters(messages []LLMMessage, schemaT any) (openai
 		return openai.ChatCompletionNewParams{}, err
 	}
 
+	tools, err := o.createToolParams()
+	if err != nil {
+		return openai.ChatCompletionNewParams{}, fmt.Errorf("failed to create tool parameters: %w", err)
+	}
+
 	params := openai.ChatCompletionNewParams{
 		Messages:    openAIMessages,
 		Model:       o.model,
 		Temperature: openai.Float(o.temperature),
-		Tools:       o.createToolParams(),
+		Tools:       tools,
 	}
 
 	if schemaT != nil {
@@ -156,20 +156,25 @@ func (o *openAILLM) createParameters(messages []LLMMessage, schemaT any) (openai
 	return params, nil
 }
 
-func (o *openAILLM) createToolParams() []openai.ChatCompletionToolParam {
+func (o *openAILLM) createToolParams() ([]openai.ChatCompletionToolParam, error) {
 	toolParams := make([]openai.ChatCompletionToolParam, 0, len(o.tools))
 
 	for _, tool := range o.tools {
+		parameterSchema, err := schema.GenerateSchema(tool.ParametersSchema)
+		if err != nil {
+			return nil, err
+		}
+
 		toolParams = append(toolParams, openai.ChatCompletionToolParam{
 			Function: openai.FunctionDefinitionParam{
 				Name:        string(tool.Name),
 				Description: openai.String(tool.Description),
-				Parameters:  tool.ParametersSchema,
+				Parameters:  parameterSchema,
 			},
 		})
 	}
 
-	return toolParams
+	return toolParams, nil
 }
 
 func (o *openAILLM) createMessages(msgs []LLMMessage) ([]openai.ChatCompletionMessageParamUnion, error) {
