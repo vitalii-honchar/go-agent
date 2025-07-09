@@ -10,6 +10,11 @@ import (
 
 var ErrCannotCreateSchema = errors.New("cannot create schema from output type")
 
+var reflector = jsonschema.Reflector{
+	AllowAdditionalProperties: false,
+	DoNotReference:            true,
+}
+
 // Generate a JSON schema from the Go type T
 func GenerateSchema(schemaT any) (map[string]any, error) {
 	schema, err := GenerateSchemaStr(schemaT)
@@ -27,7 +32,7 @@ func GenerateSchema(schemaT any) (map[string]any, error) {
 }
 
 func GenerateSchemaStr(schemaT any) (string, error) {
-	schema := jsonschema.Reflect(schemaT)
+	schema := reflector.Reflect(schemaT)
 	schemaMap, err := json.Marshal(schema)
 	if err != nil {
 		return "", fmt.Errorf("%w: %v", ErrCannotCreateSchema, err)

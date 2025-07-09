@@ -84,27 +84,22 @@ func (o *openAILLM) Call(ctx context.Context, msgs []LLMMessage) (LLMMessage, er
 	return o.newLLMMessage(completion.Choices[0]), nil
 }
 
-func (o *openAILLM) CallWithStructuredOutput(ctx context.Context, msgs []LLMMessage, schemaT any) (any, error) {
+func (o *openAILLM) CallWithStructuredOutput(ctx context.Context, msgs []LLMMessage, schemaT any) (string, error) {
 	params, err := o.createParametersWithStructuredOutput(msgs, schemaT)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create OpenAI parameters: %w", err)
+		return "", fmt.Errorf("failed to create OpenAI parameters: %w", err)
 	}
 
 	completion, err := o.client.Chat.Completions.New(ctx, params)
 	if err != nil {
-		return nil, fmt.Errorf("OpenAI API call failed: %w", err)
+		return "", fmt.Errorf("OpenAI API call failed: %w", err)
 	}
 
 	if len(completion.Choices) == 0 {
-		return nil, fmt.Errorf("no response from OpenAI")
+		return "", fmt.Errorf("no response from OpenAI")
 	}
 
-	var result any
-	if err := json.Unmarshal([]byte(completion.Choices[0].Message.Content), &result); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal structured output: %w", err)
-	}
-
-	return result, nil
+	return completion.Choices[0].Message.Content, nil
 }
 
 func (o *openAILLM) newLLMMessage(choice openai.ChatCompletionChoice) LLMMessage {

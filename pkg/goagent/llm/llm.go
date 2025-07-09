@@ -3,6 +3,7 @@ package llm
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 )
@@ -14,7 +15,7 @@ var ErrStructuredOutput = errors.New("failed to call LLM with structured output"
 // LLM represents a language model interface
 type LLM interface {
 	Call(ctx context.Context, msgs []LLMMessage) (LLMMessage, error)
-	CallWithStructuredOutput(ctx context.Context, msgs []LLMMessage, schemaT any) (any, error)
+	CallWithStructuredOutput(ctx context.Context, msgs []LLMMessage, schemaT any) (string, error)
 }
 
 // Call the LLM with structured output
@@ -25,10 +26,11 @@ func CallWithStructuredOutput[T any](ctx context.Context, llm LLM, msgs []LLMMes
 		return result, fmt.Errorf("%w: %s", ErrStructuredOutput, err)
 	}
 
-	if typedResult, ok := output.(T); ok {
-		return typedResult, nil
+	if err := json.Unmarshal([]byte(output), &result); err != nil {
+		return result, fmt.Errorf("%w: %s", ErrStructuredOutput, err)
 	}
-	return result, fmt.Errorf("%w: unexpected output type - %T", ErrStructuredOutput, output)
+
+	return result, nil
 }
 
 // CreateLLM creates a new LLM instance based on the configuration
