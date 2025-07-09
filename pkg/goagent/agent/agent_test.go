@@ -268,7 +268,7 @@ You have add tool limit of 3 and hash tool limit of 1. Use add tool 3 times, the
 
 	addCallCount := atomic.LoadInt64(addToolCallCounter)
 	hashCallCount := atomic.LoadInt64(hashToolCallCounter)
-	
+
 	assert.Equal(t, int64(3), addCallCount, "Add tool should have been called exactly 3 times")
 	assert.Equal(t, int64(1), hashCallCount, "Hash tool should have been called exactly 1 time")
 	assert.Equal(t, 16, result.Data.FinalNumber, "Final number should be 16 (10+2+2+2)")
@@ -386,43 +386,42 @@ Use the add tool exactly 2 times.`),
 	t.Logf("✅ Final result: %d", result.Data.FinalNumber)
 }
 
-
 type (
 	AddNumbers struct {
-		Num1 int `json:"num1"`
-		Num2 int `json:"num2"`
+		Num1 int `json:"num1" jsonschema_description:"First number to add"`
+		Num2 int `json:"num2" jsonschema_description:"Second number to add"`
 	}
 
 	AddNumbersResult struct {
-		Sum int `json:"sum"`
+		Sum int `json:"sum" jsonschema_description:"Sum of the two numbers"`
 	}
 
 	AddToolResult struct {
 		llm.BaseLLMToolResult
-		Sum float64 `json:"sum"`
+		Sum float64 `json:"sum" jsonschema_description:"Sum of the two numbers"`
 	}
 
 	IncrementInput struct {
-		StartNumber int `json:"start_number"`
-		Steps       int `json:"steps"`
+		StartNumber int `json:"start_number" jsonschema_description:"Starting number for increment"`
+		Steps       int `json:"steps" jsonschema_description:"Number of steps to increment"`
 	}
 
 	IncrementResult struct {
-		FinalNumber int                      `json:"final_number"`
-		Steps       []map[string]interface{} `json:"steps"`
+		FinalNumber int      `json:"final_number" jsonschema_description:"Final result after all increments"`
+		Steps       []string `json:"steps" jsonschema_description:"List of steps taken to reach the final number"`
 	}
 
 	HashToolResult struct {
 		llm.BaseLLMToolResult
-		Hash string `json:"hash"`
+		Hash string `json:"hash" jsonschema_description:"SHA256 hash of the input text"`
 	}
 
 	HashInput struct {
-		Text string `json:"text"`
+		Text string `json:"text" jsonschema_description:"Text to hash"`
 	}
 
 	HashResult struct {
-		Hash string `json:"hash"`
+		Hash string `json:"hash" jsonschema_description:"Hex hash of the input text"`
 	}
 )
 

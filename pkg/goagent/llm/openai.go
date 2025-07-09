@@ -67,39 +67,37 @@ func newOpenAILLM(options ...openAILLMOption) *openAILLM {
 }
 
 func (o *openAILLM) Call(ctx context.Context, msgs []LLMMessage) (LLMMessage, error) {
-	params, err := o.createParameters(msgs)
+	choice, err := o.callLLM(ctx, msgs, nil)
 	if err != nil {
-		return LLMMessage{}, fmt.Errorf("failed to create OpenAI parameters: %w", err)
+		return LLMMessage{}, err
 	}
 
-	completion, err := o.client.Chat.Completions.New(ctx, params)
-	if err != nil {
-		return LLMMessage{}, fmt.Errorf("OpenAI API call failed: %w", err)
-	}
-
-	if len(completion.Choices) == 0 {
-		return LLMMessage{}, fmt.Errorf("no response from OpenAI")
-	}
-
-	return o.newLLMMessage(completion.Choices[0]), nil
+	return o.newLLMMessage(choice), nil
 }
 
 func (o *openAILLM) CallWithStructuredOutput(ctx context.Context, msgs []LLMMessage, schemaT any) (string, error) {
-	params, err := o.createParametersWithStructuredOutput(msgs, schemaT)
+	choice, err := o.callLLM(ctx, msgs, schemaT)
 	if err != nil {
-		return "", fmt.Errorf("failed to create OpenAI parameters: %w", err)
+		return "", err
+	}
+	return choice.Message.Content, nil
+}
+
+func (o *openAILLM) callLLM(ctx context.Context, msgs []LLMMessage, schemaT any) (openai.ChatCompletionChoice, error) {
+	params, err := o.createParameters(msgs, schemaT)
+	if err != nil {
+		return openai.ChatCompletionChoice{}, fmt.Errorf("failed to create OpenAI parameters: %w", err)
 	}
 
 	completion, err := o.client.Chat.Completions.New(ctx, params)
 	if err != nil {
-		return "", fmt.Errorf("OpenAI API call failed: %w", err)
+		return openai.ChatCompletionChoice{}, fmt.Errorf("OpenAI API call failed: %w", err)
 	}
 
 	if len(completion.Choices) == 0 {
-		return "", fmt.Errorf("no response from OpenAI")
+		return openai.ChatCompletionChoice{}, fmt.Errorf("no response from OpenAI")
 	}
-
-	return completion.Choices[0].Message.Content, nil
+	return completion.Choices[0], nil
 }
 
 func (o *openAILLM) newLLMMessage(choice openai.ChatCompletionChoice) LLMMessage {
@@ -124,47 +122,38 @@ func (o *openAILLM) createLLMToolCalls(choice openai.ChatCompletionChoice) []LLM
 	return res
 }
 
-func (o *openAILLM) createParameters(messages []LLMMessage) (openai.ChatCompletionNewParams, error) {
+func (o *openAILLM) createParameters(messages []LLMMessage, schemaT any) (openai.ChatCompletionNewParams, error) {
 	openAIMessages, err := o.createMessages(messages)
 	if err != nil {
 		return openai.ChatCompletionNewParams{}, err
 	}
 
-	return openai.ChatCompletionNewParams{
+	params := openai.ChatCompletionNewParams{
 		Messages:    openAIMessages,
 		Model:       o.model,
 		Temperature: openai.Float(o.temperature),
 		Tools:       o.createToolParams(),
-	}, nil
-}
-
-func (o *openAILLM) createParametersWithStructuredOutput(messages []LLMMessage, schemaT any) (openai.ChatCompletionNewParams, error) {
-	openAIMessages, err := o.createMessages(messages)
-	if err != nil {
-		return openai.ChatCompletionNewParams{}, err
 	}
 
-	// Convert jsonschema.Schema to map[string]any directly
-	schemaMap, err := schema.GenerateSchema(schemaT)
-	if err != nil {
-		return openai.ChatCompletionNewParams{}, fmt.Errorf("failed to convert schema to map: %w", err)
+	if schemaT != nil {
+		schemaMap, err := schema.GenerateSchema(schemaT)
+		if err != nil {
+			return openai.ChatCompletionNewParams{}, fmt.Errorf("failed to convert schema to map: %w", err)
+		}
+
+		params.ResponseFormat = openai.ChatCompletionNewParamsResponseFormatUnion{
+			OfJSONSchema: &shared.ResponseFormatJSONSchemaParam{
+				JSONSchema: shared.ResponseFormatJSONSchemaJSONSchemaParam{
+					Name:        "response_schema",
+					Description: openai.String("Response schema for structured output of a conversation"),
+					Schema:      schemaMap,
+					Strict:      openai.Bool(true),
+				},
+			},
+		}
 	}
 
-	responseFormat := openai.ChatCompletionNewParamsResponseFormatUnion{}
-	responseFormat.OfJSONSchema = &shared.ResponseFormatJSONSchemaParam{
-		JSONSchema: shared.ResponseFormatJSONSchemaJSONSchemaParam{
-			Name:   "response_schema",
-			Schema: schemaMap,
-			Strict: openai.Bool(true),
-		},
-	}
-
-	return openai.ChatCompletionNewParams{
-		Messages:       openAIMessages,
-		Model:          o.model,
-		Temperature:    openai.Float(o.temperature),
-		ResponseFormat: responseFormat,
-	}, nil
+	return params, nil
 }
 
 func (o *openAILLM) createToolParams() []openai.ChatCompletionToolParam {
