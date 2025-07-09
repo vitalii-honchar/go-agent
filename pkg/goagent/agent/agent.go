@@ -30,7 +30,8 @@ var (
 	ErrEmptySystemPrompt = errors.New("system prompt cannot be empty")
 )
 
-var systemPromptTemplate = NewPrompt(`You are an agent that implements the ReAct (Reasoning-Action-Observation) pattern to solve tasks through systematic thinking and tool usage.
+var systemPromptTemplate = NewPrompt(`You are an agent that implements the ReAct ` +
+	`(Reasoning-Action-Observation) pattern to solve tasks through systematic thinking and tool usage.
 
 ## REASONING PROTOCOL
 
@@ -98,7 +99,7 @@ func NewAgent[T any](options ...AgentOption[T]) (*Agent[T], error) {
 
 	agentLLM, err := llm.CreateLLM(agent.llmConfig, agent.tools)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create LLM: %w", err)
 	}
 
 	agent.llm = agentLLM
@@ -249,17 +250,17 @@ func (a *Agent[T]) createInitState(input any) (*AgentState, error) {
 func (a *Agent[T]) createSystemPrompt(usage map[string]int) (string, error) {
 	tools, err := json.Marshal(a.tools)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to marshal tools: %w", err)
 	}
 
 	toolsUsage, err := json.Marshal(usage)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to marshal tools usage: %w", err)
 	}
 
 	callingLimits, err := json.Marshal(a.limits)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to marshal calling limits: %w", err)
 	}
 
 	return a.systemPrompt.Render(map[string]any{
@@ -271,7 +272,7 @@ func (a *Agent[T]) createSystemPrompt(usage map[string]int) (string, error) {
 }
 
 func (a *Agent[T]) callTools(llmMessage llm.LLMMessage, usage map[string]int) ([]llm.LLMToolResult, error) {
-	var results []llm.LLMToolResult
+	results := make([]llm.LLMToolResult, 0, len(llmMessage.ToolCalls))
 
 	for _, toolCall := range llmMessage.ToolCalls {
 		tool, ok := a.tools[toolCall.ToolName]

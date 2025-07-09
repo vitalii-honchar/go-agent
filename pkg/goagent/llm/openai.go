@@ -43,7 +43,7 @@ func withOpenAILLMTemperature(temperature float64) openAILLMOption {
 }
 func withOpenAILLMModel(model string) openAILLMOption {
 	return func(o *openAILLM) {
-		o.model = openai.ChatModel(model)
+		o.model = model
 	}
 }
 
@@ -115,7 +115,7 @@ func (o *openAILLM) newLLMMessage(choice openai.ChatCompletionChoice) LLMMessage
 }
 
 func (o *openAILLM) createLLMToolCalls(choice openai.ChatCompletionChoice) []LLMToolCall {
-	var res []LLMToolCall
+	res := make([]LLMToolCall, 0, len(choice.Message.ToolCalls))
 	for _, toolCall := range choice.Message.ToolCalls {
 		res = append(res, NewLLMToolCall(toolCall.ID, toolCall.Function.Name, toolCall.Function.Arguments))
 	}
@@ -168,12 +168,12 @@ func (o *openAILLM) createToolParams() ([]openai.ChatCompletionToolParam, error)
 	for _, tool := range o.tools {
 		parameterSchema, err := schema.GenerateSchema(tool.ParametersSchema)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to generate schema for tool %s: %w", tool.Name, err)
 		}
 
 		toolParams = append(toolParams, openai.ChatCompletionToolParam{
 			Function: openai.FunctionDefinitionParam{
-				Name:        string(tool.Name),
+				Name:        tool.Name,
 				Description: openai.String(tool.Description),
 				Parameters:  parameterSchema,
 			},
@@ -193,35 +193,44 @@ func (o *openAILLM) createMessages(msgs []LLMMessage) ([]openai.ChatCompletionMe
 		case LLMMessageTypeUser:
 			openAIMessages = append(openAIMessages, openai.UserMessage(msg.Content))
 		case LLMMessageTypeAssistant:
-			if len(msg.ToolCalls) > 0 {
-				// First add the assistant message with tool calls
-				messages, err := o.addToolCalls(openAIMessages, msg)
-				if err != nil {
-					return nil, err
-				}
-
-				openAIMessages = messages
-
-				// Then add tool results if any
-				if len(msg.ToolResults) > 0 {
-					messages, err = o.addToolResults(openAIMessages, msg)
-					if err != nil {
-						return nil, err
-					}
-
-					openAIMessages = messages
-				}
-			} else {
-				openAIMessages = append(openAIMessages, openai.AssistantMessage(msg.Content))
+			messages, err := o.handleAssistantMessage(openAIMessages, msg)
+			if err != nil {
+				return nil, err
 			}
+
+			openAIMessages = messages
 		}
 	}
 
 	return openAIMessages, nil
 }
 
-func (o *openAILLM) addToolCalls(openAIMessages []openai.ChatCompletionMessageParamUnion, msg LLMMessage) ([]openai.ChatCompletionMessageParamUnion, error) {
-	var toolCalls []openai.ChatCompletionMessageToolCallParam
+func (o *openAILLM) handleAssistantMessage(openAIMessages []openai.ChatCompletionMessageParamUnion,
+	msg LLMMessage) ([]openai.ChatCompletionMessageParamUnion, error) {
+	if len(msg.ToolCalls) == 0 {
+		return append(openAIMessages, openai.AssistantMessage(msg.Content)), nil
+	}
+
+	// First add the assistant message with tool calls
+	messages, err := o.addToolCalls(openAIMessages, msg)
+	if err != nil {
+		return nil, err
+	}
+
+	// Then add tool results if any
+	if len(msg.ToolResults) > 0 {
+		messages, err = o.addToolResults(messages, msg)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return messages, nil
+}
+
+func (o *openAILLM) addToolCalls(openAIMessages []openai.ChatCompletionMessageParamUnion,
+	msg LLMMessage) ([]openai.ChatCompletionMessageParamUnion, error) {
+	toolCalls := make([]openai.ChatCompletionMessageToolCallParam, 0, len(msg.ToolCalls))
 
 	for _, toolCall := range msg.ToolCalls {
 		argsJSON, err := json.Marshal(toolCall.Args)
@@ -246,7 +255,8 @@ func (o *openAILLM) addToolCalls(openAIMessages []openai.ChatCompletionMessagePa
 	return openAIMessages, nil
 }
 
-func (o *openAILLM) addToolResults(openAIMessages []openai.ChatCompletionMessageParamUnion, msg LLMMessage) ([]openai.ChatCompletionMessageParamUnion, error) {
+func (o *openAILLM) addToolResults(openAIMessages []openai.ChatCompletionMessageParamUnion,
+	msg LLMMessage) ([]openai.ChatCompletionMessageParamUnion, error) {
 	for _, toolRes := range msg.ToolResults {
 		toolResJSON, err := json.Marshal(toolRes)
 		if err != nil {

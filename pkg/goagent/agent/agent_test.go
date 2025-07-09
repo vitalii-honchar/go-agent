@@ -30,7 +30,9 @@ func TestSumAgent(t *testing.T) {
 			Model:       "gpt-4.1",
 			Temperature: 0.0,
 		}),
-		agent.WithBehavior[AddNumbersResult]("You are a calculator agent. You MUST use the add tool to calculate the sum of the two provided numbers. Do NOT calculate manually. Return the result in the specified JSON format."),
+		agent.WithBehavior[AddNumbersResult](
+			"You are a calculator agent. You MUST use the add tool to calculate the sum of the two provided numbers. " +
+				"Do NOT calculate manually. Return the result in the specified JSON format."),
 		agent.WithTool[AddNumbersResult]("add", addTool),
 		agent.WithToolLimit[AddNumbersResult]("add", 1),
 	)
@@ -160,12 +162,31 @@ You MUST use the add tool for each increment. Do NOT calculate manually.`),
 }
 
 func TestToolLimitReached(t *testing.T) {
+	t.Parallel()
 	t.Skip()
-	// given
+	
 	toolCallCounter, addTool := createAddTool(t)
-
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	require.NotEmpty(t, apiKey, "OPENAI_API_KEY environment variable must be set")
+
+	behavior := `You are a calculation agent that can ONLY perform arithmetic using the add tool. ` +
+		`You have no ability to calculate numbers manually.
+
+Your task: You need to increment the start_number by adding complex floating point numbers that you cannot ` +
+		`calculate yourself.
+
+Process:
+1. Use add tool to add start_number + 0.12345
+2. Use add tool to add result + 0.23456  
+3. Use add tool to add result + 0.34567
+4. Use add tool to add result + 0.45678
+5. Use add tool to add result + 0.56789
+
+You MUST use the add tool for each step because these floating point calculations are too complex for you to do ` +
+		`manually. 
+Do not try to calculate yourself - you will get wrong results. Always use the add tool.
+
+Continue making these precise floating point additions until you have made at least 3 tool calls.`
 
 	limitTestAgent, err := agent.NewAgent(
 		agent.WithName[IncrementResult]("limit-tester"),
@@ -175,21 +196,7 @@ func TestToolLimitReached(t *testing.T) {
 			Model:       "gpt-4.1",
 			Temperature: 0.0,
 		}),
-		agent.WithBehavior[IncrementResult](`You are a calculation agent that can ONLY perform arithmetic using the add tool. You have no ability to calculate numbers manually.
-
-Your task: You need to increment the start_number by adding complex floating point numbers that you cannot calculate yourself.
-
-Process:
-1. Use add tool to add start_number + 0.12345
-2. Use add tool to add result + 0.23456  
-3. Use add tool to add result + 0.34567
-4. Use add tool to add result + 0.45678
-5. Use add tool to add result + 0.56789
-
-You MUST use the add tool for each step because these floating point calculations are too complex for you to do manually. 
-Do not try to calculate yourself - you will get wrong results. Always use the add tool.
-
-Continue making these precise floating point additions until you have made at least 3 tool calls.`),
+		agent.WithBehavior[IncrementResult](behavior),
 		agent.WithTool[IncrementResult]("add", addTool),
 		agent.WithToolLimit[IncrementResult]("add", 1),
 	)
@@ -203,12 +210,16 @@ Continue making these precise floating point additions until you have made at le
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	t.Logf("🚀 Starting tool limit test: %d + floating point numbers (x%d times) with limit of 1", input.StartNumber, input.Steps)
+	t.Logf("🚀 Starting tool limit test: %d + floating point numbers (x%d times) with limit of 1",
+		input.StartNumber, input.Steps)
 
-	// when
 	result, err := limitTestAgent.Run(ctx, input)
 
-	// then
+	verifyLimitReached(t, result, err, toolCallCounter)
+	t.Logf("📝 Messages count: %d", len(result.Messages))
+}
+
+func verifyLimitReached(t *testing.T, result *agent.AgentResult[IncrementResult], err error, toolCallCounter *int64) {
 	require.ErrorIs(t, err, agent.ErrLimitReached, "Agent should return ErrLimitReached")
 	require.NotNil(t, result, "Result should not be nil even when limit reached")
 	require.Nil(t, result.Data, "Result data should be nil when limit reached")
@@ -219,7 +230,6 @@ Continue making these precise floating point additions until you have made at le
 
 	t.Logf("🔧 Tool called %d times (limit: 1)", finalCount)
 	t.Logf("✅ Limit reached as expected with error: %v", err)
-	t.Logf("📝 Messages count: %d", len(result.Messages))
 }
 
 func TestMultiToolLimitReached(t *testing.T) {
@@ -447,13 +457,13 @@ func createAddTool(t *testing.T) (*int64, llm.LLMTool) {
 		llm.WithLLMToolName("add"),
 		llm.WithLLMToolDescription("Adds two numbers together"),
 		llm.WithLLMToolParametersSchema[AddToolParams](),
-		llm.WithLLMToolCall(func(id string, params AddToolParams) (AddToolResult, error) {
+		llm.WithLLMToolCall(func(callID string, params AddToolParams) (AddToolResult, error) {
 			callCount := atomic.AddInt64(counter, 1)
 			t.Logf("🔧 TOOL CALL #%d: add(num1=%v, num2=%v)", callCount, params.Num1, params.Num2)
 
 			result := AddToolResult{
 				BaseLLMToolResult: llm.BaseLLMToolResult{
-					ID: id,
+					ID: callID,
 				},
 				Sum: params.Num1 + params.Num2,
 			}
@@ -475,7 +485,8 @@ func createHashTool(t *testing.T) (*int64, llm.LLMTool) {
 		llm.WithLLMToolName("hash"),
 		llm.WithLLMToolDescription("Computes SHA256 hash of input string"),
 		llm.WithLLMToolParametersSchema[HashToolParams](),
-		llm.WithLLMToolCall[HashToolParams, HashToolResult](func(id string, params HashToolParams) (HashToolResult, error) {
+		llm.WithLLMToolCall[HashToolParams, HashToolResult](
+			func(callID string, params HashToolParams) (HashToolResult, error) {
 			callCount := atomic.AddInt64(counter, 1)
 			t.Logf("🔧 TOOL CALL #%d: hash(input='%s')", callCount, params.Input)
 
@@ -484,7 +495,7 @@ func createHashTool(t *testing.T) (*int64, llm.LLMTool) {
 			t.Logf("🔧 TOOL RESULT #%d: hash(input='%s') = %s", callCount, params.Input, hash)
 
 			return HashToolResult{
-				BaseLLMToolResult: llm.BaseLLMToolResult{ID: id},
+				BaseLLMToolResult: llm.BaseLLMToolResult{ID: callID},
 				Hash:              hash,
 			}, nil
 		}),

@@ -46,8 +46,8 @@ func NewConfig() *Config {
 
 // getEnvStr returns the value of an environment variable or a default value if it's not set
 func getEnvStr(envVar string, defaultValue string) string {
-	v := os.Getenv(envVar)
-	if v == "" {
+	value := os.Getenv(envVar)
+	if value == "" {
 		if defaultValue == "" {
 			log.Fatalf("environment variable cannot be empty and no default provided: %s", envVar)
 		}
@@ -55,19 +55,19 @@ func getEnvStr(envVar string, defaultValue string) string {
 		return defaultValue
 	}
 
-	return v
+	return value
 }
 
 // getEnvInt returns the value of an environment variable as an integer or a default value if it's not set
 func getEnvInt(envVar string, defaultValue int) int {
-	v := os.Getenv(envVar)
-	if v == "" {
+	value := os.Getenv(envVar)
+	if value == "" {
 		return defaultValue
 	}
 
-	i, err := strconv.Atoi(v)
+	i, err := strconv.Atoi(value)
 	if err != nil {
-		log.Fatalf("environment variable must be an integer: name = %s, value = %s", envVar, v)
+		log.Fatalf("environment variable must be an integer: name = %s, value = %s", envVar, value)
 	}
 
 	return i
@@ -75,14 +75,14 @@ func getEnvInt(envVar string, defaultValue int) int {
 
 // getEnvFloat returns the value of an environment variable as a float64 or a default value if it's not set
 func getEnvFloat(envVar string, defaultValue float64) float64 {
-	v := os.Getenv(envVar)
-	if v == "" {
+	value := os.Getenv(envVar)
+	if value == "" {
 		return defaultValue
 	}
 
-	f, err := strconv.ParseFloat(v, 64)
+	f, err := strconv.ParseFloat(value, 64)
 	if err != nil {
-		log.Fatalf("environment variable must be a float: name = %s, value = %s", envVar, v)
+		log.Fatalf("environment variable must be a float: name = %s, value = %s", envVar, value)
 	}
 
 	return f

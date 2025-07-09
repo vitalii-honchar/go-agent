@@ -53,15 +53,15 @@ func WithLLMToolParametersSchema[T any]() LLMToolOption {
 }
 
 // WithLLMToolCall sets the call function for the tool
-func WithLLMToolCall[P any, T LLMToolResult](callFunc func(id string, args P) (T, error)) LLMToolOption {
+func WithLLMToolCall[P any, T LLMToolResult](callFunc func(callID string, args P) (T, error)) LLMToolOption {
 	return func(tool *LLMTool) {
-		tool.Call = func(id string, args string) (LLMToolResult, error) {
+		tool.Call = func(callID string, args string) (LLMToolResult, error) {
 			var typedArgs P
 			if err := json.Unmarshal([]byte(args), &typedArgs); err != nil {
 				return nil, fmt.Errorf("%w: failed to unmarshal arguments: %v", ErrInvalidArguments, err)
 			}
 
-			result, err := callFunc(id, typedArgs)
+			result, err := callFunc(callID, typedArgs)
 			if err != nil {
 				return nil, err
 			}
