@@ -11,8 +11,8 @@ import (
 var ErrCannotCreateSchema = errors.New("cannot create schema from output type")
 
 // Generate a JSON schema from the Go type T
-func GenerateSchema[T any]() (map[string]any, error) {
-	schema, err := GenerateSchemaStr[T]()
+func GenerateSchema(schemaT any) (map[string]any, error) {
+	schema, err := GenerateSchemaStr(schemaT)
 
 	if err != nil {
 		return nil, err
@@ -26,8 +26,8 @@ func GenerateSchema[T any]() (map[string]any, error) {
 	return result, nil
 }
 
-func GenerateSchemaStr[T any]() (string, error) {
-	schema := jsonschema.Reflect(new(T))
+func GenerateSchemaStr(schemaT any) (string, error) {
+	schema := jsonschema.Reflect(schemaT)
 	schemaMap, err := json.Marshal(schema)
 	if err != nil {
 		return "", fmt.Errorf("%w: %v", ErrCannotCreateSchema, err)

@@ -14,7 +14,7 @@ var ErrStructuredOutput = errors.New("failed to call LLM with structured output"
 // LLM represents a language model interface
 type LLM interface {
 	Call(ctx context.Context, msgs []LLMMessage) (LLMMessage, error)
-	CallWithStructuredOutput(ctx context.Context, msgs []LLMMessage, schema any) (any, error)
+	CallWithStructuredOutput(ctx context.Context, msgs []LLMMessage, schemaT any) (any, error)
 }
 
 // Call the LLM with structured output
