@@ -32,7 +32,6 @@ func TestSumAgent(t *testing.T) {
 		agent.WithBehavior[AddNumbersResult]("You are a calculator agent. You MUST use the add tool to calculate the sum of the two provided numbers. Do NOT calculate manually. Return the result in the specified JSON format."),
 		agent.WithTool[AddNumbersResult]("add", addTool),
 		agent.WithToolLimit[AddNumbersResult]("add", 1),
-		agent.WithOutputSchema(&AddNumbersResult{}),
 	)
 	require.NoError(t, err, "Failed to create agent")
 
@@ -78,7 +77,6 @@ func TestHashAgent(t *testing.T) {
 		You MUST use the hash tool to compute the hash of the provided text. 
 		Do NOT try to compute hashes manually.`),
 		agent.WithTool[HashResult]("hash", hashTool),
-		agent.WithOutputSchema(&HashResult{}),
 	)
 	require.NoError(t, err)
 
@@ -127,7 +125,6 @@ func TestSequentialToolCalls(t *testing.T) {
 You MUST use the add tool for each increment. Do NOT calculate manually.`),
 		agent.WithTool[IncrementResult]("add", addTool),
 		agent.WithToolLimit[IncrementResult]("add", 5),
-		agent.WithOutputSchema(&IncrementResult{}),
 	)
 	require.NoError(t, err)
 
@@ -190,7 +187,6 @@ Do not try to calculate yourself - you will get wrong results. Always use the ad
 Continue making these precise floating point additions until you have made at least 3 tool calls.`),
 		agent.WithTool[IncrementResult]("add", addTool),
 		agent.WithToolLimit[IncrementResult]("add", 1),
-		agent.WithOutputSchema(&IncrementResult{}),
 	)
 	require.NoError(t, err)
 
@@ -248,7 +244,6 @@ You have add tool limit of 3 and hash tool limit of 1. Use add tool 3 times, the
 		agent.WithTool[IncrementResult]("hash", hashTool),
 		agent.WithToolLimit[IncrementResult]("add", 3),
 		agent.WithToolLimit[IncrementResult]("hash", 1),
-		agent.WithOutputSchema(&IncrementResult{}),
 	)
 	require.NoError(t, err)
 
@@ -308,7 +303,6 @@ func TestDefaultToolLimit(t *testing.T) {
 Use the add tool exactly 3 times.`),
 		agent.WithTool[IncrementResult]("add", addTool),
 		// Note: No explicit tool limit set - should use default of 3
-		agent.WithOutputSchema(&IncrementResult{}),
 	)
 	require.NoError(t, err)
 
@@ -363,7 +357,6 @@ Use the add tool exactly 2 times.`),
 		agent.WithTool[IncrementResult]("add", addTool),
 		agent.WithDefaultToolLimit[IncrementResult](2), // Custom default limit
 		// Note: No explicit tool limit set - should use custom default of 2
-		agent.WithOutputSchema(&IncrementResult{}),
 	)
 	require.NoError(t, err)
 
