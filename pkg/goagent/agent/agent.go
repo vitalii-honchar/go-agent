@@ -6,29 +6,28 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/vitalii-honchar/go-agent/pkg/goagent/llm"
 	"strings"
 
-	"github.com/invopop/jsonschema"
+	"github.com/vitalii-honchar/go-agent/pkg/goagent/llm"
 )
 
 var (
 	// ErrLimitReached is returned when a tool usage limit is exceeded
-	ErrLimitReached        = errors.New("tool limit reached")
+	ErrLimitReached = errors.New("tool limit reached")
 	// ErrToolError is returned when a tool call fails
-	ErrToolError           = errors.New("tool error occurred")
+	ErrToolError = errors.New("tool error occurred")
 	// ErrLLMCall is returned when an LLM call fails
-	ErrLLMCall             = errors.New("LLM call error occurred")
+	ErrLLMCall = errors.New("LLM call error occurred")
 	// ErrFinish is returned when LLM execution is finished
-	ErrFinish              = errors.New("LLM finished execution")
+	ErrFinish = errors.New("LLM finished execution")
 	// ErrToolNotFound is returned when a requested tool is not found
-	ErrToolNotFound        = errors.New("tool not found")
+	ErrToolNotFound = errors.New("tool not found")
 	// ErrInvalidResultSchema is returned when result validation fails
 	ErrInvalidResultSchema = errors.New("invalid result schema")
 	// ErrCannotCreateSchema is returned when schema creation fails
-	ErrCannotCreateSchema  = errors.New("cannot create schema from output type")
+	ErrCannotCreateSchema = errors.New("cannot create schema from output type")
 	// ErrEmptySystemPrompt is returned when system prompt is empty
-	ErrEmptySystemPrompt   = errors.New("system prompt cannot be empty")
+	ErrEmptySystemPrompt = errors.New("system prompt cannot be empty")
 )
 
 var systemPromptTemplate = NewPrompt(`You are an agent that implements the ReAct (Reasoning-Action-Observation) pattern to solve tasks through systematic thinking and tool usage.
@@ -53,17 +52,21 @@ CURRENT TOOLS USAGE:
 TOOLS USAGE LIMITS:
 {{.calling_limits}}
 
-OUTPUT SCHEMA:
-{{.output_schema}}
-
 ## AGENT BEHAVIOR
 
 <BEHAVIOR>
 {{.behavior}}
 </BEHAVIOR>
-
-At the end of execution when you are ready to finish, return a JSON object that matches the output schema.
 `)
+
+var outputPromptTemplate = NewPrompt(`Based on the entire conversation above, provide your final output.
+
+Requirements:
+- Synthesize all findings from your reasoning and observations
+- Structure the output according to the required schema
+- Include only factual information gathered during your analysis
+- Ensure all required fields are populated with relevant data
+- Output ONLY the JSON object with no additional text`)
 
 // Agent represents a configurable AI agent with tools and behavior
 type Agent[T any] struct {
@@ -98,6 +101,7 @@ func NewAgent[T any](options ...AgentOption[T]) (*Agent[T], error) {
 		return nil, err
 	}
 	agent.llm = agentLLM
+	agent.outputSchema = new(T)
 
 	return agent, nil
 }
@@ -120,13 +124,6 @@ func WithLLMConfig[T any](config llm.LLMConfig) AgentOption[T] {
 func WithBehavior[T any](behavior string) AgentOption[T] {
 	return func(a *Agent[T]) {
 		a.behavior = strings.TrimSpace(behavior)
-	}
-}
-
-// WithOutputSchema sets the expected output schema for the agent
-func WithOutputSchema[T any](schema *T) AgentOption[T] {
-	return func(a *Agent[T]) {
-		a.outputSchema = schema
 	}
 }
 
@@ -208,7 +205,7 @@ func (a *Agent[T]) Run(ctx context.Context, input any) (*AgentResult[T], error) 
 		state.AddMessage(llmMessage)
 
 		if llmMessage.End {
-			return a.createResult(state)
+			return a.createResult(ctx, state)
 		}
 
 		newSystemPrompt, err := a.createSystemPrompt(usage)
@@ -243,12 +240,6 @@ func (a *Agent[T]) createInitState(input any) (*AgentState, error) {
 }
 
 func (a *Agent[T]) createSystemPrompt(usage map[string]int) (string, error) {
-	schema := jsonschema.Reflect(a.outputSchema)
-	outputSchema, err := json.Marshal(schema)
-	if err != nil {
-		return "", err
-	}
-
 	tools, err := json.Marshal(a.tools)
 	if err != nil {
 		return "", err
@@ -268,7 +259,6 @@ func (a *Agent[T]) createSystemPrompt(usage map[string]int) (string, error) {
 		"tools":          string(tools),
 		"tools_usage":    string(toolsUsage),
 		"calling_limits": string(callingLimits),
-		"output_schema":  string(outputSchema),
 		"behavior":       a.behavior,
 	})
 }
@@ -280,12 +270,12 @@ func (a *Agent[T]) callTools(llmMessage llm.LLMMessage, usage map[string]int) ([
 		if !ok {
 			return nil, fmt.Errorf("%w: %s", ErrToolNotFound, toolCall.ToolName)
 		}
-		
+
 		limit := a.GetToolLimit(toolCall.ToolName)
 		if usage[toolCall.ToolName] >= limit {
 			return nil, ErrLimitReached
 		}
-		
+
 		toolRes, err := tool.Call(toolCall.ID, toolCall.Args)
 		if err != nil {
 			return nil, fmt.Errorf("%w: %s", ErrToolError, err)
@@ -297,16 +287,23 @@ func (a *Agent[T]) callTools(llmMessage llm.LLMMessage, usage map[string]int) ([
 	return results, nil
 }
 
-func (a *Agent[T]) createResult(state *AgentState) (*AgentResult[T], error) {
-	var data T
+func (a *Agent[T]) createResult(ctx context.Context, state *AgentState) (*AgentResult[T], error) {
+	// Create output prompt with schema
+	outputPrompt, err := outputPromptTemplate.Render(map[string]any{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to render output prompt: %w", err)
+	}
 
-	if err := json.Unmarshal([]byte(state.Messages[len(state.Messages)-1].Content), &data); err != nil {
-		return nil, fmt.Errorf("%w: %s", ErrInvalidResultSchema, err)
+	state.Messages = append(state.Messages, llm.NewLLMMessage(llm.LLMMessageTypeUser, outputPrompt))
+
+	// Call LLM with structured output
+	result, err := llm.CallWithStructuredOutput[T](ctx, a.llm, state.Messages)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", ErrLLMCall, err)
 	}
 
 	return &AgentResult[T]{
-		Data:     &data,
+		Data:     &result,
 		Messages: state.Messages,
 	}, nil
 }
-

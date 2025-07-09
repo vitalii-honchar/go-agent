@@ -8,6 +8,7 @@ import (
 
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
+	"github.com/openai/openai-go/shared"
 )
 
 const (
@@ -82,6 +83,29 @@ func (o *openAILLM) Call(ctx context.Context, msgs []LLMMessage) (LLMMessage, er
 	return o.newLLMMessage(completion.Choices[0]), nil
 }
 
+func (o *openAILLM) CallWithStructuredOutput(ctx context.Context, msgs []LLMMessage, schema *any) (any, error) {
+	params, err := o.createParametersWithStructuredOutput(msgs, schema)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create OpenAI parameters: %w", err)
+	}
+
+	completion, err := o.client.Chat.Completions.New(ctx, params)
+	if err != nil {
+		return nil, fmt.Errorf("OpenAI API call failed: %w", err)
+	}
+
+	if len(completion.Choices) == 0 {
+		return nil, fmt.Errorf("no response from OpenAI")
+	}
+
+	var result any
+	if err := json.Unmarshal([]byte(completion.Choices[0].Message.Content), &result); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal structured output: %w", err)
+	}
+
+	return result, nil
+}
+
 func (o *openAILLM) newLLMMessage(choice openai.ChatCompletionChoice) LLMMessage {
 	return LLMMessage{
 		Type:      LLMMessageTypeAssistant,
@@ -116,6 +140,51 @@ func (o *openAILLM) createParameters(messages []LLMMessage) (openai.ChatCompleti
 		Temperature: openai.Float(o.temperature),
 		Tools:       o.createToolParams(),
 	}, nil
+}
+
+func (o *openAILLM) createParametersWithStructuredOutput(messages []LLMMessage, schema *any) (openai.ChatCompletionNewParams, error) {
+	openAIMessages, err := o.createMessages(messages)
+	if err != nil {
+		return openai.ChatCompletionNewParams{}, err
+	}
+
+	// Convert jsonschema.Schema to map[string]any directly
+	schemaMap, err := o.schemaToMap(*schema)
+	if err != nil {
+		return openai.ChatCompletionNewParams{}, fmt.Errorf("failed to convert schema to map: %w", err)
+	}
+
+	responseFormat := openai.ChatCompletionNewParamsResponseFormatUnion{}
+	responseFormat.OfJSONSchema = &shared.ResponseFormatJSONSchemaParam{
+		JSONSchema: shared.ResponseFormatJSONSchemaJSONSchemaParam{
+			Name:   "response_schema",
+			Schema: schemaMap,
+			Strict: openai.Bool(true),
+		},
+	}
+
+	return openai.ChatCompletionNewParams{
+		Messages:       openAIMessages,
+		Model:          o.model,
+		Temperature:    openai.Float(o.temperature),
+		ResponseFormat: responseFormat,
+	}, nil
+}
+
+func (o *openAILLM) schemaToMap(schema any) (map[string]any, error) {
+	// The schema should be a *jsonschema.Schema, so we can marshal it directly
+	// This preserves all the schema information without losing anything
+	schemaJSON, err := json.Marshal(schema)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal jsonschema.Schema: %w", err)
+	}
+
+	var schemaMap map[string]any
+	if err := json.Unmarshal(schemaJSON, &schemaMap); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal schema to map: %w", err)
+	}
+
+	return schemaMap, nil
 }
 
 func (o *openAILLM) createToolParams() []openai.ChatCompletionToolParam {

@@ -3,15 +3,32 @@ package llm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 )
 
 // ErrUnsupportedLLMType is returned when an unsupported LLM type is specified
-var ErrUnsupportedLLMType = fmt.Errorf("unsupported LLM type")
+var ErrUnsupportedLLMType = errors.New("unsupported LLM type")
+var ErrStructuredOutput = errors.New("failed to call LLM with structured output")
 
 // LLM represents a language model interface
 type LLM interface {
 	Call(ctx context.Context, msgs []LLMMessage) (LLMMessage, error)
+	CallWithStructuredOutput(ctx context.Context, msgs []LLMMessage, schema any) (any, error)
+}
+
+// Call the LLM with structured output
+func CallWithStructuredOutput[T any](ctx context.Context, llm LLM, msgs []LLMMessage) (T, error) {
+	var result T
+	output, err := llm.CallWithStructuredOutput(ctx, msgs, new(T))
+	if err != nil {
+		return result, fmt.Errorf("%w: %s", ErrStructuredOutput, err)
+	}
+
+	if typedResult, ok := output.(T); ok {
+		return typedResult, nil
+	}
+	return result, fmt.Errorf("%w: unexpected output type - %T", ErrStructuredOutput, output)
 }
 
 // CreateLLM creates a new LLM instance based on the configuration
