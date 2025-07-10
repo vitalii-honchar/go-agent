@@ -38,8 +38,8 @@ import (
 
 // Define your output schema
 type MathResult struct {
-    Answer int    `json:"answer"`
-    Steps  string `json:"steps"`
+    Answer int    `json:"answer" jsonschema_description:"The calculated answer"`
+    Steps  string `json:"steps" jsonschema_description:"The calculation steps taken"`
 }
 
 func main() {
@@ -53,7 +53,6 @@ func main() {
             Temperature: 0.0,
         }),
         agent.WithBehavior[MathResult]("You are a math solver. Calculate the given expression and show your work."),
-        agent.WithOutputSchema(&MathResult{}),
     )
     if err != nil {
         panic(err)
@@ -75,24 +74,26 @@ func main() {
 ### Adding Custom Tools
 
 ```go
+// Define tool parameters
+type AddToolParams struct {
+    Num1 float64 `json:"num1" jsonschema_description:"First number to add"`
+    Num2 float64 `json:"num2" jsonschema_description:"Second number to add"`
+}
+
+type AddResult struct {
+    llm.BaseLLMToolResult
+    Sum float64 `json:"sum" jsonschema_description:"Sum of the two numbers"`
+}
+
 // Create a custom tool
 addTool := llm.NewLLMTool(
     llm.WithLLMToolName("add"),
     llm.WithLLMToolDescription("Adds two numbers together"),
-    llm.WithLLMToolParametersSchema(map[string]any{
-        "type": "object",
-        "properties": map[string]any{
-            "a": map[string]any{"type": "number"},
-            "b": map[string]any{"type": "number"},
-        },
-        "required": []string{"a", "b"},
-    }),
-    llm.WithLLMToolCall(func(id string, args map[string]any) (AddResult, error) {
-        a := args["a"].(float64)
-        b := args["b"].(float64)
+    llm.WithLLMToolParametersSchema[AddToolParams](),
+    llm.WithLLMToolCall(func(callID string, params AddToolParams) (AddResult, error) {
         return AddResult{
-            BaseLLMToolResult: llm.BaseLLMToolResult{ID: id},
-            Sum:              a + b,
+            BaseLLMToolResult: llm.BaseLLMToolResult{ID: callID},
+            Sum:              params.Num1 + params.Num2,
         }, nil
     }),
 )
@@ -104,7 +105,6 @@ calculatorAgent, err := agent.NewAgent(
     agent.WithBehavior[CalculatorResult]("Use the add tool to calculate sums. Do not calculate manually."),
     agent.WithTool[CalculatorResult]("add", addTool),
     agent.WithToolLimit[CalculatorResult]("add", 5), // Max 5 calls
-    agent.WithOutputSchema(&CalculatorResult{}),
 )
 ```
 
@@ -189,23 +189,23 @@ import (
 
 // Define input and output types
 type AddNumbers struct {
-    Num1 int `json:"num1"`
-    Num2 int `json:"num2"`
+    Num1 int `json:"num1" jsonschema_description:"First number to add"`
+    Num2 int `json:"num2" jsonschema_description:"Second number to add"`
 }
 
 type AddNumbersResult struct {
-    Sum int `json:"sum"`
+    Sum int `json:"sum" jsonschema_description:"Sum of the two numbers"`
 }
 
 // Define tool parameters and result
 type AddToolParams struct {
-    Num1 float64 `json:"num1"`
-    Num2 float64 `json:"num2"`
+    Num1 float64 `json:"num1" jsonschema_description:"First number to add"`
+    Num2 float64 `json:"num2" jsonschema_description:"Second number to add"`
 }
 
 type AddToolResult struct {
     llm.BaseLLMToolResult
-    Sum float64 `json:"sum"`
+    Sum float64 `json:"sum" jsonschema_description:"Sum of the two numbers"`
 }
 
 func main() {
@@ -259,13 +259,13 @@ This example shows an agent that makes multiple sequential tool calls:
 ```go
 // Define types for incremental operations
 type IncrementInput struct {
-    StartNumber int `json:"start_number"`
-    Steps       int `json:"steps"`
+    StartNumber int `json:"start_number" jsonschema_description:"Starting number for increment"`
+    Steps       int `json:"steps" jsonschema_description:"Number of steps to increment"`
 }
 
 type IncrementResult struct {
-    FinalNumber int      `json:"final_number"`
-    Steps       []string `json:"steps"`
+    FinalNumber int      `json:"final_number" jsonschema_description:"Final result after all increments"`
+    Steps       []string `json:"steps" jsonschema_description:"List of steps taken to reach the final number"`
 }
 
 func createIncrementAgent() (*agent.Agent[IncrementResult], error) {
@@ -328,12 +328,12 @@ This example demonstrates using multiple tools with different limits:
 ```go
 // Hash tool types
 type HashToolParams struct {
-    Input string `json:"input"`
+    Input string `json:"input" jsonschema_description:"Text to hash"`
 }
 
 type HashToolResult struct {
     llm.BaseLLMToolResult
-    Hash string `json:"hash"`
+    Hash string `json:"hash" jsonschema_description:"SHA256 hash of the input text"`
 }
 
 func createMultiToolAgent() (*agent.Agent[IncrementResult], error) {
@@ -355,14 +355,13 @@ func createMultiToolAgent() (*agent.Agent[IncrementResult], error) {
         llm.WithLLMToolName("hash"),
         llm.WithLLMToolDescription("Computes SHA256 hash of input string"),
         llm.WithLLMToolParametersSchema[HashToolParams](),
-        llm.WithLLMToolCall[HashToolParams, HashToolResult](
-            func(callID string, params HashToolParams) (HashToolResult, error) {
-                hash := fmt.Sprintf("%x", []byte(params.Input))
-                return HashToolResult{
-                    BaseLLMToolResult: llm.BaseLLMToolResult{ID: callID},
-                    Hash:              hash,
-                }, nil
-            }),
+        llm.WithLLMToolCall(func(callID string, params HashToolParams) (HashToolResult, error) {
+            hash := fmt.Sprintf("%x", []byte(params.Input))
+            return HashToolResult{
+                BaseLLMToolResult: llm.BaseLLMToolResult{ID: callID},
+                Hash:              hash,
+            }, nil
+        }),
     )
 
     return agent.NewAgent(
