@@ -1,4 +1,4 @@
-package llm
+package openai
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
 	"github.com/openai/openai-go/shared"
+	"github.com/vitalii-honchar/go-agent/pkg/goagent/llm"
 	"github.com/vitalii-honchar/go-agent/pkg/goagent/schema"
 )
 
@@ -26,42 +27,43 @@ var (
 	ErrNoResponseFromOpenAI = errors.New("no response from OpenAI")
 )
 
-type openAILLM struct {
+type OpenAILLM struct {
 	client      openai.Client
 	apiKey      string
 	temperature float64
 	model       openai.ChatModel
-	tools       []LLMTool
+	tools       []llm.LLMTool
 }
 
-type openAILLMOption func(o *openAILLM)
+type OpenAILLMOption func(o *OpenAILLM)
 
-func withOpenAILLMTemperature(temperature float64) openAILLMOption {
-	return func(o *openAILLM) {
+func WithTemperature(temperature float64) OpenAILLMOption {
+	return func(o *OpenAILLM) {
 		o.temperature = temperature
 	}
 }
-func withOpenAILLMModel(model string) openAILLMOption {
-	return func(o *openAILLM) {
+
+func WithModel(model string) OpenAILLMOption {
+	return func(o *OpenAILLM) {
 		o.model = model
 	}
 }
 
-func withOpenAIAPIKey(apiKey string) openAILLMOption {
-	return func(o *openAILLM) {
+func WithAPIKey(apiKey string) OpenAILLMOption {
+	return func(o *OpenAILLM) {
 		o.apiKey = apiKey
 		o.client = openai.NewClient(option.WithAPIKey(apiKey))
 	}
 }
 
-func withOpenAITools(tools []LLMTool) openAILLMOption {
-	return func(o *openAILLM) {
+func WithTools(tools []llm.LLMTool) OpenAILLMOption {
+	return func(o *OpenAILLM) {
 		o.tools = tools
 	}
 }
 
-func newOpenAILLM(options ...openAILLMOption) *openAILLM {
-	llm := &openAILLM{}
+func NewOpenAILLM(options ...OpenAILLMOption) *OpenAILLM {
+	llm := &OpenAILLM{}
 	for _, opt := range options {
 		opt(llm)
 	}
@@ -69,16 +71,16 @@ func newOpenAILLM(options ...openAILLMOption) *openAILLM {
 	return llm
 }
 
-func (o *openAILLM) Call(ctx context.Context, msgs []LLMMessage) (LLMMessage, error) {
+func (o *OpenAILLM) Call(ctx context.Context, msgs []llm.LLMMessage) (llm.LLMMessage, error) {
 	choice, err := o.callLLM(ctx, msgs, nil)
 	if err != nil {
-		return LLMMessage{}, err
+		return llm.LLMMessage{}, err
 	}
 
 	return o.newLLMMessage(choice), nil
 }
 
-func (o *openAILLM) CallWithStructuredOutput(ctx context.Context, msgs []LLMMessage, schemaT any) (string, error) {
+func (o *OpenAILLM) CallWithStructuredOutput(ctx context.Context, msgs []llm.LLMMessage, schemaT any) (string, error) {
 	choice, err := o.callLLM(ctx, msgs, schemaT)
 	if err != nil {
 		return "", err
@@ -87,7 +89,9 @@ func (o *openAILLM) CallWithStructuredOutput(ctx context.Context, msgs []LLMMess
 	return choice.Message.Content, nil
 }
 
-func (o *openAILLM) callLLM(ctx context.Context, msgs []LLMMessage, schemaT any) (openai.ChatCompletionChoice, error) {
+func (o *OpenAILLM) callLLM(
+	ctx context.Context, msgs []llm.LLMMessage, schemaT any,
+) (openai.ChatCompletionChoice, error) {
 	params, err := o.createParameters(msgs, schemaT)
 	if err != nil {
 		return openai.ChatCompletionChoice{}, fmt.Errorf("failed to create OpenAI parameters: %w", err)
@@ -105,25 +109,25 @@ func (o *openAILLM) callLLM(ctx context.Context, msgs []LLMMessage, schemaT any)
 	return completion.Choices[0], nil
 }
 
-func (o *openAILLM) newLLMMessage(choice openai.ChatCompletionChoice) LLMMessage {
-	return LLMMessage{
-		Type:      LLMMessageTypeAssistant,
+func (o *OpenAILLM) newLLMMessage(choice openai.ChatCompletionChoice) llm.LLMMessage {
+	return llm.LLMMessage{
+		Type:      llm.LLMMessageTypeAssistant,
 		Content:   choice.Message.Content,
 		ToolCalls: o.createLLMToolCalls(choice),
 		End:       choice.FinishReason == openAIFinishReasonStop || choice.FinishReason == openAIFinishReasonLength,
 	}
 }
 
-func (o *openAILLM) createLLMToolCalls(choice openai.ChatCompletionChoice) []LLMToolCall {
-	res := make([]LLMToolCall, 0, len(choice.Message.ToolCalls))
+func (o *OpenAILLM) createLLMToolCalls(choice openai.ChatCompletionChoice) []llm.LLMToolCall {
+	res := make([]llm.LLMToolCall, 0, len(choice.Message.ToolCalls))
 	for _, toolCall := range choice.Message.ToolCalls {
-		res = append(res, NewLLMToolCall(toolCall.ID, toolCall.Function.Name, toolCall.Function.Arguments))
+		res = append(res, llm.NewLLMToolCall(toolCall.ID, toolCall.Function.Name, toolCall.Function.Arguments))
 	}
 
 	return res
 }
 
-func (o *openAILLM) createParameters(messages []LLMMessage, schemaT any) (openai.ChatCompletionNewParams, error) {
+func (o *OpenAILLM) createParameters(messages []llm.LLMMessage, schemaT any) (openai.ChatCompletionNewParams, error) {
 	openAIMessages, err := o.createMessages(messages)
 	if err != nil {
 		return openai.ChatCompletionNewParams{}, err
@@ -162,7 +166,7 @@ func (o *openAILLM) createParameters(messages []LLMMessage, schemaT any) (openai
 	return params, nil
 }
 
-func (o *openAILLM) createToolParams() ([]openai.ChatCompletionToolParam, error) {
+func (o *OpenAILLM) createToolParams() ([]openai.ChatCompletionToolParam, error) {
 	toolParams := make([]openai.ChatCompletionToolParam, 0, len(o.tools))
 
 	for _, tool := range o.tools {
@@ -183,16 +187,16 @@ func (o *openAILLM) createToolParams() ([]openai.ChatCompletionToolParam, error)
 	return toolParams, nil
 }
 
-func (o *openAILLM) createMessages(msgs []LLMMessage) ([]openai.ChatCompletionMessageParamUnion, error) {
+func (o *OpenAILLM) createMessages(msgs []llm.LLMMessage) ([]openai.ChatCompletionMessageParamUnion, error) {
 	openAIMessages := make([]openai.ChatCompletionMessageParamUnion, 0, len(msgs))
 
 	for _, msg := range msgs {
 		switch msg.Type {
-		case LLMMessageTypeSystem:
+		case llm.LLMMessageTypeSystem:
 			openAIMessages = append(openAIMessages, openai.SystemMessage(msg.Content))
-		case LLMMessageTypeUser:
+		case llm.LLMMessageTypeUser:
 			openAIMessages = append(openAIMessages, openai.UserMessage(msg.Content))
-		case LLMMessageTypeAssistant:
+		case llm.LLMMessageTypeAssistant:
 			messages, err := o.handleAssistantMessage(openAIMessages, msg)
 			if err != nil {
 				return nil, err
@@ -205,8 +209,8 @@ func (o *openAILLM) createMessages(msgs []LLMMessage) ([]openai.ChatCompletionMe
 	return openAIMessages, nil
 }
 
-func (o *openAILLM) handleAssistantMessage(openAIMessages []openai.ChatCompletionMessageParamUnion,
-	msg LLMMessage) ([]openai.ChatCompletionMessageParamUnion, error) {
+func (o *OpenAILLM) handleAssistantMessage(openAIMessages []openai.ChatCompletionMessageParamUnion,
+	msg llm.LLMMessage) ([]openai.ChatCompletionMessageParamUnion, error) {
 	if len(msg.ToolCalls) == 0 {
 		return append(openAIMessages, openai.AssistantMessage(msg.Content)), nil
 	}
@@ -228,8 +232,8 @@ func (o *openAILLM) handleAssistantMessage(openAIMessages []openai.ChatCompletio
 	return messages, nil
 }
 
-func (o *openAILLM) addToolCalls(openAIMessages []openai.ChatCompletionMessageParamUnion,
-	msg LLMMessage) ([]openai.ChatCompletionMessageParamUnion, error) {
+func (o *OpenAILLM) addToolCalls(openAIMessages []openai.ChatCompletionMessageParamUnion,
+	msg llm.LLMMessage) ([]openai.ChatCompletionMessageParamUnion, error) {
 	toolCalls := make([]openai.ChatCompletionMessageToolCallParam, 0, len(msg.ToolCalls))
 
 	for _, toolCall := range msg.ToolCalls {
@@ -255,8 +259,8 @@ func (o *openAILLM) addToolCalls(openAIMessages []openai.ChatCompletionMessagePa
 	return openAIMessages, nil
 }
 
-func (o *openAILLM) addToolResults(openAIMessages []openai.ChatCompletionMessageParamUnion,
-	msg LLMMessage) ([]openai.ChatCompletionMessageParamUnion, error) {
+func (o *OpenAILLM) addToolResults(openAIMessages []openai.ChatCompletionMessageParamUnion,
+	msg llm.LLMMessage) ([]openai.ChatCompletionMessageParamUnion, error) {
 	for _, toolRes := range msg.ToolResults {
 		toolResJSON, err := json.Marshal(toolRes)
 		if err != nil {

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/vitalii-honchar/go-agent/pkg/goagent/llm"
+	"github.com/vitalii-honchar/go-agent/pkg/goagent/llmfactory"
 )
 
 var (
@@ -97,7 +98,7 @@ func NewAgent[T any](options ...AgentOption[T]) (*Agent[T], error) {
 		opt(agent)
 	}
 
-	agentLLM, err := llm.CreateLLM(agent.llmConfig, agent.tools)
+	agentLLM, err := llmfactory.CreateLLM(agent.llmConfig, agent.tools)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create LLM: %w", err)
 	}
