@@ -44,4 +44,3 @@ linters:
     - wastedassign
     - whitespace
     - wrapcheck
-    - wsl_v5
