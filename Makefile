@@ -1,8 +1,11 @@
 
-build:
+build: lint
 	go build ./pkg/goagent/...
 
-lint:
+fmt:
+	gofmt -w .
+
+lint: fmt
 	golangci-lint run
 
 test:
@@ -13,4 +16,4 @@ test:
 	fi
 	go tool cover -func=coverage.out
 
-.PHONY: build lint test
+.PHONY: build fmt lint test
