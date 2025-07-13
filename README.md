@@ -9,6 +9,14 @@ A powerful, production-ready Go library for building AI agents with configurable
 [![GoDoc](https://godoc.org/github.com/vitalii-honchar/go-agent?status.svg)](https://godoc.org/github.com/vitalii-honchar/go-agent)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+## 🌟 Why Choose Go Agent?
+
+- **Production Ready** - Used in real-world applications with robust error handling
+- **Developer Friendly** - Intuitive API design with comprehensive examples
+- **Extensible** - Easy to add custom tools and integrate with external services
+- **Type Safe** - Leverage Go's type system for reliable agent development
+- **Well Tested** - Comprehensive test suite with high code coverage
+
 ## ✨ Features
 
 - 🤖 **Generic AI Agents** - Type-safe agents with custom output schemas
@@ -197,14 +205,6 @@ make lint
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🌟 Why Choose Go Agent?
-
-- **Production Ready** - Used in real-world applications with robust error handling
-- **Developer Friendly** - Intuitive API design with comprehensive examples
-- **Extensible** - Easy to add custom tools and integrate with external services
-- **Type Safe** - Leverage Go's type system for reliable agent development
-- **Well Tested** - Comprehensive test suite with high code coverage
 
 ## 📬 Stay Connected
 
