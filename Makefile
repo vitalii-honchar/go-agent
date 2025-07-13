@@ -4,7 +4,8 @@ lint:
 
 test:
 	@if [ -f .env ]; then \
-		export $$(cat .env | xargs) && go test -v ./...; \
+		export $$(cat .env | xargs) && go test -v -coverprofile=coverage.out ./...; \
 	else \
-		go test -v ./...; \
+		go test -v -coverprofile=coverage.out ./...; \
 	fi
+	go tool cover -func=coverage.out
