@@ -537,6 +537,7 @@ func TestWithSystemPrompt(t *testing.T) {
 }
 
 func TestNewAgentResult(t *testing.T) {
+	t.Parallel()
 	data := &AddNumbersResult{Sum: 10}
 	messages := []llm.LLMMessage{
 		llm.NewLLMMessage(llm.LLMMessageTypeUser, "Test message"),
@@ -551,6 +552,7 @@ func TestNewAgentResult(t *testing.T) {
 }
 
 func TestNewAgentResult_NilData(t *testing.T) {
+	t.Parallel()
 	messages := []llm.LLMMessage{
 		llm.NewLLMMessage(llm.LLMMessageTypeUser, "Test message"),
 	}
@@ -558,17 +560,18 @@ func TestNewAgentResult_NilData(t *testing.T) {
 	result, err := agent.NewAgentResult[AddNumbersResult](nil, messages)
 
 	require.Error(t, err)
-	assert.ErrorIs(t, err, agent.ErrInvalidResultSchema)
+	require.ErrorIs(t, err, agent.ErrInvalidResultSchema)
 	assert.Nil(t, result)
 }
 
 func TestNewAgentResult_EmptyMessages(t *testing.T) {
+	t.Parallel()
 	data := &AddNumbersResult{Sum: 10}
 
 	result, err := agent.NewAgentResult(data, []llm.LLMMessage{})
 
 	require.Error(t, err)
-	assert.ErrorIs(t, err, agent.ErrInvalidResultSchema)
+	require.ErrorIs(t, err, agent.ErrInvalidResultSchema)
 	assert.Nil(t, result)
 }
 

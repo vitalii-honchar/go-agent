@@ -11,6 +11,7 @@ import (
 )
 
 func TestNewConfig_WithDefaults(t *testing.T) {
+	t.Parallel()
 	// Clear environment variables to test defaults
 	clearEnvVars(t)
 	// Set a dummy API key to avoid fatal error
@@ -28,11 +29,12 @@ func TestNewConfig_WithDefaults(t *testing.T) {
 	assert.Equal(t, "test-key", cfg.OpenAI.APIKey)
 	assert.Equal(t, "gpt-4", cfg.OpenAI.Model)
 	assert.Equal(t, 4096, cfg.OpenAI.MaxTokens)
-	assert.Equal(t, 0.7, cfg.OpenAI.Temperature)
+	assert.InDelta(t, 0.7, cfg.OpenAI.Temperature, 0.01)
 	assert.Equal(t, 30*time.Second, cfg.OpenAI.Timeout)
 }
 
 func TestNewConfig_WithEnvironmentVariables(t *testing.T) {
+	t.Parallel()
 	// Set environment variables
 	setEnvVars(t, map[string]string{
 		"OPENAI_API_KEY":         "test-api-key",
@@ -50,11 +52,12 @@ func TestNewConfig_WithEnvironmentVariables(t *testing.T) {
 	assert.Equal(t, "test-api-key", cfg.OpenAI.APIKey)
 	assert.Equal(t, "gpt-4o-mini", cfg.OpenAI.Model)
 	assert.Equal(t, 2048, cfg.OpenAI.MaxTokens)
-	assert.Equal(t, 0.5, cfg.OpenAI.Temperature)
+	assert.InDelta(t, 0.5, cfg.OpenAI.Temperature, 0.01)
 	assert.Equal(t, 60*time.Second, cfg.OpenAI.Timeout)
 }
 
 func TestNewConfig_PartialEnvironmentVariables(t *testing.T) {
+	t.Parallel()
 	// Set only some environment variables
 	setEnvVars(t, map[string]string{
 		"OPENAI_API_KEY": "partial-test-key",
@@ -70,11 +73,12 @@ func TestNewConfig_PartialEnvironmentVariables(t *testing.T) {
 	assert.Equal(t, "gpt-3.5-turbo", cfg.OpenAI.Model)
 	// These should use defaults
 	assert.Equal(t, 4096, cfg.OpenAI.MaxTokens)
-	assert.Equal(t, 0.7, cfg.OpenAI.Temperature)
+	assert.InDelta(t, 0.7, cfg.OpenAI.Temperature, 0.01)
 	assert.Equal(t, 30*time.Second, cfg.OpenAI.Timeout)
 }
 
 func TestNewConfig_InvalidIntegerEnvironmentVariable(t *testing.T) {
+	t.Parallel()
 	setEnvVars(t, map[string]string{
 		"OPENAI_MAX_TOKENS": "not-a-number",
 	})
@@ -87,6 +91,7 @@ func TestNewConfig_InvalidIntegerEnvironmentVariable(t *testing.T) {
 }
 
 func TestNewConfig_InvalidFloatEnvironmentVariable(t *testing.T) {
+	t.Parallel()
 	setEnvVars(t, map[string]string{
 		"OPENAI_TEMPERATURE": "not-a-float",
 	})
@@ -97,6 +102,7 @@ func TestNewConfig_InvalidFloatEnvironmentVariable(t *testing.T) {
 }
 
 func TestNewConfig_ZeroValues(t *testing.T) {
+	t.Parallel()
 	setEnvVars(t, map[string]string{
 		"OPENAI_API_KEY":         "test-key",
 		"OPENAI_MAX_TOKENS":      "0",
@@ -110,11 +116,12 @@ func TestNewConfig_ZeroValues(t *testing.T) {
 	require.NotNil(t, cfg)
 	require.NotNil(t, cfg.OpenAI)
 	assert.Equal(t, 0, cfg.OpenAI.MaxTokens)
-	assert.Equal(t, 0.0, cfg.OpenAI.Temperature)
+	assert.InDelta(t, 0.0, cfg.OpenAI.Temperature, 0.01)
 	assert.Equal(t, 0*time.Second, cfg.OpenAI.Timeout)
 }
 
 func TestNewConfig_ExtremeValues(t *testing.T) {
+	t.Parallel()
 	setEnvVars(t, map[string]string{
 		"OPENAI_API_KEY":         "test-key",
 		"OPENAI_MAX_TOKENS":      "100000",
@@ -128,7 +135,7 @@ func TestNewConfig_ExtremeValues(t *testing.T) {
 	require.NotNil(t, cfg)
 	require.NotNil(t, cfg.OpenAI)
 	assert.Equal(t, 100000, cfg.OpenAI.MaxTokens)
-	assert.Equal(t, 2.0, cfg.OpenAI.Temperature)
+	assert.InDelta(t, 2.0, cfg.OpenAI.Temperature, 0.01)
 	assert.Equal(t, 3600*time.Second, cfg.OpenAI.Timeout)
 }
 

@@ -9,6 +9,7 @@ import (
 )
 
 func TestNewLLMMessage(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		msgType  llm.LLMMessageType
@@ -55,6 +56,7 @@ func TestNewLLMMessage(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := llm.NewLLMMessage(tt.msgType, tt.content)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -62,16 +64,18 @@ func TestNewLLMMessage(t *testing.T) {
 }
 
 func TestNewLLMTool(t *testing.T) {
+	t.Parallel()
 	tool := llm.NewLLMTool()
 	
 	// Default tool should have empty values
-	assert.Equal(t, "", tool.Name)
-	assert.Equal(t, "", tool.Description)
+	assert.Empty(t, tool.Name)
+	assert.Empty(t, tool.Description)
 	assert.Nil(t, tool.ParametersSchema)
 	assert.Nil(t, tool.Call)
 }
 
 func TestWithLLMToolName(t *testing.T) {
+	t.Parallel()
 	name := "test-tool"
 	tool := llm.NewLLMTool(
 		llm.WithLLMToolName(name),
@@ -81,6 +85,7 @@ func TestWithLLMToolName(t *testing.T) {
 }
 
 func TestWithLLMToolDescription(t *testing.T) {
+	t.Parallel()
 	description := "A test tool for testing"
 	tool := llm.NewLLMTool(
 		llm.WithLLMToolDescription(description),
@@ -90,6 +95,7 @@ func TestWithLLMToolDescription(t *testing.T) {
 }
 
 func TestWithLLMToolParametersSchema(t *testing.T) {
+	t.Parallel()
 	type TestParams struct {
 		Value string `json:"value"`
 	}
@@ -104,6 +110,7 @@ func TestWithLLMToolParametersSchema(t *testing.T) {
 }
 
 func TestWithLLMToolCall(t *testing.T) {
+	t.Parallel()
 	type TestParams struct {
 		Input string `json:"input"`
 	}
@@ -137,6 +144,7 @@ func TestWithLLMToolCall(t *testing.T) {
 }
 
 func TestWithLLMToolCall_InvalidJSON(t *testing.T) {
+	t.Parallel()
 	type TestParams struct {
 		Input string `json:"input"`
 	}
@@ -164,6 +172,7 @@ func TestWithLLMToolCall_InvalidJSON(t *testing.T) {
 }
 
 func TestLLMTool_CompleteConfiguration(t *testing.T) {
+	t.Parallel()
 	type TestParams struct {
 		X int `json:"x"`
 		Y int `json:"y"`
@@ -202,23 +211,26 @@ func TestLLMTool_CompleteConfiguration(t *testing.T) {
 }
 
 func TestBaseLLMToolResult_GetID(t *testing.T) {
+	t.Parallel()
 	result := llm.BaseLLMToolResult{ID: "test-id-123"}
 	assert.Equal(t, "test-id-123", result.GetID())
 }
 
 func TestNewLLMToolCall(t *testing.T) {
-	id := "call-123"
+	t.Parallel()
+	callID := "call-123"
 	toolName := "test-tool"
 	args := `{"param": "value"}`
 	
-	toolCall := llm.NewLLMToolCall(id, toolName, args)
+	toolCall := llm.NewLLMToolCall(callID, toolName, args)
 	
-	assert.Equal(t, id, toolCall.ID)
+	assert.Equal(t, callID, toolCall.ID)
 	assert.Equal(t, toolName, toolCall.ToolName)
 	assert.Equal(t, args, toolCall.Args)
 }
 
 func TestLLMMessageTypes(t *testing.T) {
+	t.Parallel()
 	assert.Equal(t, "user", string(llm.LLMMessageTypeUser))
 	assert.Equal(t, "assistant", string(llm.LLMMessageTypeAssistant))
 	assert.Equal(t, "system", string(llm.LLMMessageTypeSystem))

@@ -10,6 +10,7 @@ import (
 )
 
 func TestCreateLLM_OpenAI(t *testing.T) {
+	t.Parallel()
 	cfg := llm.LLMConfig{
 		Type:        llm.LLMTypeOpenAI,
 		APIKey:      "test-key",
@@ -28,6 +29,7 @@ func TestCreateLLM_OpenAI(t *testing.T) {
 }
 
 func TestCreateLLM_OpenAI_NoTools(t *testing.T) {
+	t.Parallel()
 	cfg := llm.LLMConfig{
 		Type:        llm.LLMTypeOpenAI,
 		APIKey:      "test-key",
@@ -42,6 +44,7 @@ func TestCreateLLM_OpenAI_NoTools(t *testing.T) {
 }
 
 func TestCreateLLM_OpenAI_EmptyTools(t *testing.T) {
+	t.Parallel()
 	cfg := llm.LLMConfig{
 		Type:        llm.LLMTypeOpenAI,
 		APIKey:      "test-key",
@@ -58,6 +61,7 @@ func TestCreateLLM_OpenAI_EmptyTools(t *testing.T) {
 }
 
 func TestCreateLLM_UnsupportedType(t *testing.T) {
+	t.Parallel()
 	cfg := llm.LLMConfig{
 		Type:        "unsupported",
 		APIKey:      "test-key",
@@ -68,11 +72,12 @@ func TestCreateLLM_UnsupportedType(t *testing.T) {
 	result, err := llmfactory.CreateLLM(cfg, nil)
 
 	require.Error(t, err)
-	assert.ErrorIs(t, err, llm.ErrUnsupportedLLMType)
+	require.ErrorIs(t, err, llm.ErrUnsupportedLLMType)
 	assert.Nil(t, result)
 }
 
 func TestCreateLLM_MultipleTools(t *testing.T) {
+	t.Parallel()
 	cfg := llm.LLMConfig{
 		Type:        llm.LLMTypeOpenAI,
 		APIKey:      "test-key",

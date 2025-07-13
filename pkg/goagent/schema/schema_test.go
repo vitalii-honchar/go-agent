@@ -10,9 +10,10 @@ import (
 )
 
 func TestGenerateSchema_SimpleStruct(t *testing.T) {
+	t.Parallel()
 	type Person struct {
 		Name string `json:"name" jsonschema_description:"Person's name"`
-		Age  int    `json:"age" jsonschema_description:"Person's age"`
+		Age  int    `json:"age"  jsonschema_description:"Person's age"`
 	}
 
 	result, err := schema.GenerateSchema(Person{})
@@ -23,13 +24,14 @@ func TestGenerateSchema_SimpleStruct(t *testing.T) {
 	assert.Equal(t, "object", result["type"])
 	assert.Contains(t, result, "properties")
 
-	properties, ok := result["properties"].(map[string]interface{})
-	require.True(t, ok)
+	properties, isOK := result["properties"].(map[string]interface{})
+	require.True(t, isOK)
 	assert.Contains(t, properties, "name")
 	assert.Contains(t, properties, "age")
 }
 
 func TestGenerateSchema_NestedStruct(t *testing.T) {
+	t.Parallel()
 	type Address struct {
 		Street string `json:"street"`
 		City   string `json:"city"`
@@ -46,17 +48,18 @@ func TestGenerateSchema_NestedStruct(t *testing.T) {
 	assert.NotNil(t, result)
 	assert.Contains(t, result, "properties")
 
-	properties, ok := result["properties"].(map[string]interface{})
-	require.True(t, ok)
+	properties, isOK := result["properties"].(map[string]interface{})
+	require.True(t, isOK)
 	assert.Contains(t, properties, "name")
 	assert.Contains(t, properties, "address")
 
-	address, ok := properties["address"].(map[string]interface{})
-	require.True(t, ok)
+	address, addressOK := properties["address"].(map[string]interface{})
+	require.True(t, addressOK)
 	assert.Contains(t, address, "properties")
 }
 
 func TestGenerateSchema_WithSlice(t *testing.T) {
+	t.Parallel()
 	type Person struct {
 		Name  string   `json:"name"`
 		Hobbies []string `json:"hobbies"`
@@ -68,16 +71,17 @@ func TestGenerateSchema_WithSlice(t *testing.T) {
 	assert.NotNil(t, result)
 	assert.Contains(t, result, "properties")
 
-	properties, ok := result["properties"].(map[string]interface{})
-	require.True(t, ok)
+	properties, isOK := result["properties"].(map[string]interface{})
+	require.True(t, isOK)
 	assert.Contains(t, properties, "hobbies")
 
-	hobbies, ok := properties["hobbies"].(map[string]interface{})
-	require.True(t, ok)
+	hobbies, hobbiesOK := properties["hobbies"].(map[string]interface{})
+	require.True(t, hobbiesOK)
 	assert.Equal(t, "array", hobbies["type"])
 }
 
 func TestGenerateSchema_WithPointer(t *testing.T) {
+	t.Parallel()
 	type Person struct {
 		Name *string `json:"name,omitempty"`
 		Age  int     `json:"age"`
@@ -91,6 +95,7 @@ func TestGenerateSchema_WithPointer(t *testing.T) {
 }
 
 func TestGenerateSchemaStr_SimpleStruct(t *testing.T) {
+	t.Parallel()
 	type Simple struct {
 		Value string `json:"value"`
 	}
@@ -109,6 +114,7 @@ func TestGenerateSchemaStr_SimpleStruct(t *testing.T) {
 }
 
 func TestGenerateSchemaStr_EmptyStruct(t *testing.T) {
+	t.Parallel()
 	type Empty struct{}
 
 	result, err := schema.GenerateSchemaStr(Empty{})
@@ -124,6 +130,7 @@ func TestGenerateSchemaStr_EmptyStruct(t *testing.T) {
 }
 
 func TestGenerateSchema_ComplexTypes(t *testing.T) {
+	t.Parallel()
 	type Config struct {
 		Enabled    bool               `json:"enabled"`
 		Count      int                `json:"count"`
@@ -138,8 +145,8 @@ func TestGenerateSchema_ComplexTypes(t *testing.T) {
 	assert.NotNil(t, result)
 	assert.Contains(t, result, "properties")
 
-	properties, ok := result["properties"].(map[string]interface{})
-	require.True(t, ok)
+	properties, isOK := result["properties"].(map[string]interface{})
+	require.True(t, isOK)
 	assert.Contains(t, properties, "enabled")
 	assert.Contains(t, properties, "count")
 	assert.Contains(t, properties, "rate")
@@ -148,9 +155,10 @@ func TestGenerateSchema_ComplexTypes(t *testing.T) {
 }
 
 func TestGenerateSchema_WithDescription(t *testing.T) {
+	t.Parallel()
 	type Documented struct {
 		Name string `json:"name" jsonschema_description:"The user's full name"`
-		Age  int    `json:"age" jsonschema_description:"The user's age in years"`
+		Age  int    `json:"age"  jsonschema_description:"The user's age in years"`
 	}
 
 	result, err := schema.GenerateSchema(Documented{})
@@ -159,11 +167,11 @@ func TestGenerateSchema_WithDescription(t *testing.T) {
 	assert.NotNil(t, result)
 	assert.Contains(t, result, "properties")
 
-	properties, ok := result["properties"].(map[string]interface{})
-	require.True(t, ok)
+	properties, isOK := result["properties"].(map[string]interface{})
+	require.True(t, isOK)
 	
-	name, ok := properties["name"].(map[string]interface{})
-	require.True(t, ok)
+	name, nameOK := properties["name"].(map[string]interface{})
+	require.True(t, nameOK)
 	assert.Contains(t, name, "description")
 	assert.Equal(t, "The user's full name", name["description"])
 }

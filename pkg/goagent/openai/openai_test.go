@@ -75,7 +75,7 @@ func TestOpenAILLM_CallWithStructuredOutput(t *testing.T) {
 
 	type Person struct {
 		Name string `json:"name" jsonschema_description:"Person's name"`
-		Age  int    `json:"age" jsonschema_description:"Person's age"`
+		Age  int    `json:"age"  jsonschema_description:"Person's age"`
 	}
 
 	result, err := openaiLLM.CallWithStructuredOutput(ctx, messages, Person{})
@@ -156,19 +156,7 @@ func TestOpenAILLM_CallWithAssistantMessages(t *testing.T) {
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	require.NotEmpty(t, apiKey, "OPENAI_API_KEY environment variable must be set")
 
-	// Create a simple tool for testing assistant messages with tool calls
-	addTool := llm.NewLLMTool(
-		llm.WithLLMToolName("add"),
-		llm.WithLLMToolDescription("Adds two numbers together"),
-		llm.WithLLMToolParametersSchema[AddToolParams](),
-		llm.WithLLMToolCall(func(callID string, params AddToolParams) (AddToolResult, error) {
-			return AddToolResult{
-				BaseLLMToolResult: llm.BaseLLMToolResult{ID: callID},
-				Sum:               params.Num1 + params.Num2,
-			}, nil
-		}),
-	)
-
+	addTool := createTestAddTool()
 	openaiLLM := openai.NewOpenAILLM(
 		openai.WithAPIKey(apiKey),
 		openai.WithModel("gpt-4o-mini"),
@@ -179,8 +167,30 @@ func TestOpenAILLM_CallWithAssistantMessages(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	// Create messages that include assistant message with tool calls and results
-	messages := []llm.LLMMessage{
+	messages := createTestMessages()
+	result, err := openaiLLM.Call(ctx, messages)
+
+	require.NoError(t, err)
+	assert.Equal(t, llm.LLMMessageTypeAssistant, result.Type)
+	assert.NotNil(t, result)
+}
+
+func createTestAddTool() llm.LLMTool {
+	return llm.NewLLMTool(
+		llm.WithLLMToolName("add"),
+		llm.WithLLMToolDescription("Adds two numbers together"),
+		llm.WithLLMToolParametersSchema[AddToolParams](),
+		llm.WithLLMToolCall(func(callID string, params AddToolParams) (AddToolResult, error) {
+			return AddToolResult{
+				BaseLLMToolResult: llm.BaseLLMToolResult{ID: callID},
+				Sum:               params.Num1 + params.Num2,
+			}, nil
+		}),
+	)
+}
+
+func createTestMessages() []llm.LLMMessage {
+	return []llm.LLMMessage{
 		{
 			Type:    llm.LLMMessageTypeSystem,
 			Content: "You are a calculator.",
@@ -211,13 +221,6 @@ func TestOpenAILLM_CallWithAssistantMessages(t *testing.T) {
 			Content: "Thank you! Now what is 10 + 15?",
 		},
 	}
-
-	result, err := openaiLLM.Call(ctx, messages)
-
-	require.NoError(t, err)
-	assert.Equal(t, llm.LLMMessageTypeAssistant, result.Type)
-	// Just verify we got a valid response
-	assert.NotNil(t, result)
 }
 
 func TestOpenAILLM_CallWithAssistantMessagesNoToolResults(t *testing.T) {
