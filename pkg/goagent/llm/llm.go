@@ -33,4 +33,3 @@ func CallWithStructuredOutput[T any](ctx context.Context, llm LLM, msgs []LLMMes
 
 	return result, nil
 }
-

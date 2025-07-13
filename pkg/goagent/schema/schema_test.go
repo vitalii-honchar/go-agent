@@ -61,7 +61,7 @@ func TestGenerateSchema_NestedStruct(t *testing.T) {
 func TestGenerateSchema_WithSlice(t *testing.T) {
 	t.Parallel()
 	type Person struct {
-		Name  string   `json:"name"`
+		Name    string   `json:"name"`
 		Hobbies []string `json:"hobbies"`
 	}
 
@@ -132,11 +132,11 @@ func TestGenerateSchemaStr_EmptyStruct(t *testing.T) {
 func TestGenerateSchema_ComplexTypes(t *testing.T) {
 	t.Parallel()
 	type Config struct {
-		Enabled    bool               `json:"enabled"`
-		Count      int                `json:"count"`
-		Rate       float64            `json:"rate"`
-		Tags       []string           `json:"tags"`
-		Properties map[string]string  `json:"properties"`
+		Enabled    bool              `json:"enabled"`
+		Count      int               `json:"count"`
+		Rate       float64           `json:"rate"`
+		Tags       []string          `json:"tags"`
+		Properties map[string]string `json:"properties"`
 	}
 
 	result, err := schema.GenerateSchema(Config{})
@@ -169,7 +169,7 @@ func TestGenerateSchema_WithDescription(t *testing.T) {
 
 	properties, isOK := result["properties"].(map[string]interface{})
 	require.True(t, isOK)
-	
+
 	name, nameOK := properties["name"].(map[string]interface{})
 	require.True(t, nameOK)
 	assert.Contains(t, name, "description")

@@ -5,11 +5,11 @@ type LLMMessageType string
 
 const (
 	// LLMMessageTypeUser represents a user message
-	LLMMessageTypeUser      LLMMessageType = "user"
+	LLMMessageTypeUser LLMMessageType = "user"
 	// LLMMessageTypeAssistant represents an assistant message
 	LLMMessageTypeAssistant LLMMessageType = "assistant"
 	// LLMMessageTypeSystem represents a system message
-	LLMMessageTypeSystem    LLMMessageType = "system"
+	LLMMessageTypeSystem LLMMessageType = "system"
 )
 
 // LLMMessage represents a message in an LLM conversation

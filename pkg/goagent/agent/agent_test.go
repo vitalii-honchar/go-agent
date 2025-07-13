@@ -31,7 +31,7 @@ func TestSumAgent(t *testing.T) {
 			Temperature: 0.0,
 		}),
 		agent.WithBehavior[AddNumbersResult](
-			"You are a calculator agent. You MUST use the add tool to calculate the sum of the two provided numbers. " +
+			"You are a calculator agent. You MUST use the add tool to calculate the sum of the two provided numbers. "+
 				"Do NOT calculate manually. Return the result in the specified JSON format."),
 		agent.WithTool[AddNumbersResult]("add", addTool),
 		agent.WithToolLimit[AddNumbersResult]("add", 1),
@@ -164,7 +164,7 @@ You MUST use the add tool for each increment. Do NOT calculate manually.`),
 func TestToolLimitReached(t *testing.T) {
 	t.Parallel()
 	t.Skip()
-	
+
 	toolCallCounter, addTool := createAddTool(t)
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	require.NotEmpty(t, apiKey, "OPENAI_API_KEY environment variable must be set")
@@ -487,18 +487,18 @@ func createHashTool(t *testing.T) (*int64, llm.LLMTool) {
 		llm.WithLLMToolParametersSchema[HashToolParams](),
 		llm.WithLLMToolCall[HashToolParams, HashToolResult](
 			func(callID string, params HashToolParams) (HashToolResult, error) {
-			callCount := atomic.AddInt64(counter, 1)
-			t.Logf("🔧 TOOL CALL #%d: hash(input='%s')", callCount, params.Input)
+				callCount := atomic.AddInt64(counter, 1)
+				t.Logf("🔧 TOOL CALL #%d: hash(input='%s')", callCount, params.Input)
 
-			// This would be impossible for LLM to compute manually
-			hash := fmt.Sprintf("%x", []byte(params.Input)) // Simple hex encoding as demo
-			t.Logf("🔧 TOOL RESULT #%d: hash(input='%s') = %s", callCount, params.Input, hash)
+				// This would be impossible for LLM to compute manually
+				hash := fmt.Sprintf("%x", []byte(params.Input)) // Simple hex encoding as demo
+				t.Logf("🔧 TOOL RESULT #%d: hash(input='%s') = %s", callCount, params.Input, hash)
 
-			return HashToolResult{
-				BaseLLMToolResult: llm.BaseLLMToolResult{ID: callID},
-				Hash:              hash,
-			}, nil
-		}),
+				return HashToolResult{
+					BaseLLMToolResult: llm.BaseLLMToolResult{ID: callID},
+					Hash:              hash,
+				}, nil
+			}),
 	)
 }
 

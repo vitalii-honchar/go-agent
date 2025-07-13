@@ -66,7 +66,7 @@ func TestNewLLMMessage(t *testing.T) {
 func TestNewLLMTool(t *testing.T) {
 	t.Parallel()
 	tool := llm.NewLLMTool()
-	
+
 	// Default tool should have empty values
 	assert.Empty(t, tool.Name)
 	assert.Empty(t, tool.Description)
@@ -80,7 +80,7 @@ func TestWithLLMToolName(t *testing.T) {
 	tool := llm.NewLLMTool(
 		llm.WithLLMToolName(name),
 	)
-	
+
 	assert.Equal(t, name, tool.Name)
 }
 
@@ -90,7 +90,7 @@ func TestWithLLMToolDescription(t *testing.T) {
 	tool := llm.NewLLMTool(
 		llm.WithLLMToolDescription(description),
 	)
-	
+
 	assert.Equal(t, description, tool.Description)
 }
 
@@ -103,7 +103,7 @@ func TestWithLLMToolParametersSchema(t *testing.T) {
 	tool := llm.NewLLMTool(
 		llm.WithLLMToolParametersSchema[TestParams](),
 	)
-	
+
 	assert.NotNil(t, tool.ParametersSchema)
 	_, ok := tool.ParametersSchema.(*TestParams)
 	assert.True(t, ok)
@@ -114,7 +114,7 @@ func TestWithLLMToolCall(t *testing.T) {
 	type TestParams struct {
 		Input string `json:"input"`
 	}
-	
+
 	type TestResult struct {
 		llm.BaseLLMToolResult
 		Output string `json:"output"`
@@ -130,14 +130,14 @@ func TestWithLLMToolCall(t *testing.T) {
 	tool := llm.NewLLMTool(
 		llm.WithLLMToolCall[TestParams, TestResult](callFunc),
 	)
-	
+
 	assert.NotNil(t, tool.Call)
 
 	// Test the call function
 	result, err := tool.Call("test-id", `{"input": "hello"}`)
 	require.NoError(t, err)
 	assert.Equal(t, "test-id", result.GetID())
-	
+
 	testResult, ok := result.(TestResult)
 	require.True(t, ok)
 	assert.Equal(t, "processed: hello", testResult.Output)
@@ -148,7 +148,7 @@ func TestWithLLMToolCall_InvalidJSON(t *testing.T) {
 	type TestParams struct {
 		Input string `json:"input"`
 	}
-	
+
 	type TestResult struct {
 		llm.BaseLLMToolResult
 		Output string `json:"output"`
@@ -164,7 +164,7 @@ func TestWithLLMToolCall_InvalidJSON(t *testing.T) {
 	tool := llm.NewLLMTool(
 		llm.WithLLMToolCall[TestParams, TestResult](callFunc),
 	)
-	
+
 	// Test with invalid JSON
 	_, err := tool.Call("test-id", `invalid json`)
 	require.Error(t, err)
@@ -177,7 +177,7 @@ func TestLLMTool_CompleteConfiguration(t *testing.T) {
 		X int `json:"x"`
 		Y int `json:"y"`
 	}
-	
+
 	type TestResult struct {
 		llm.BaseLLMToolResult
 		Sum int `json:"sum"`
@@ -194,7 +194,7 @@ func TestLLMTool_CompleteConfiguration(t *testing.T) {
 			}, nil
 		}),
 	)
-	
+
 	assert.Equal(t, "add", tool.Name)
 	assert.Equal(t, "Adds two numbers", tool.Description)
 	assert.NotNil(t, tool.ParametersSchema)
@@ -204,7 +204,7 @@ func TestLLMTool_CompleteConfiguration(t *testing.T) {
 	result, err := tool.Call("call-123", `{"x": 5, "y": 3}`)
 	require.NoError(t, err)
 	assert.Equal(t, "call-123", result.GetID())
-	
+
 	testResult, ok := result.(TestResult)
 	require.True(t, ok)
 	assert.Equal(t, 8, testResult.Sum)
@@ -221,9 +221,9 @@ func TestNewLLMToolCall(t *testing.T) {
 	callID := "call-123"
 	toolName := "test-tool"
 	args := `{"param": "value"}`
-	
+
 	toolCall := llm.NewLLMToolCall(callID, toolName, args)
-	
+
 	assert.Equal(t, callID, toolCall.ID)
 	assert.Equal(t, toolName, toolCall.ToolName)
 	assert.Equal(t, args, toolCall.Args)
