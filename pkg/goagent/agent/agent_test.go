@@ -501,3 +501,87 @@ func createHashTool(t *testing.T) (*int64, llm.LLMTool) {
 		}),
 	)
 }
+
+func TestWithSystemPrompt(t *testing.T) {
+	t.Parallel()
+
+	apiKey := os.Getenv("OPENAI_API_KEY")
+	require.NotEmpty(t, apiKey, "OPENAI_API_KEY environment variable must be set")
+
+	customPrompt := agent.NewPrompt("You are a custom agent with special behavior: {{.Behavior}}")
+
+	testAgent, err := agent.NewAgent(
+		agent.WithName[AddNumbersResult]("custom-prompt-agent"),
+		agent.WithLLMConfig[AddNumbersResult](llm.LLMConfig{
+			Type:        llm.LLMTypeOpenAI,
+			APIKey:      apiKey,
+			Model:       "gpt-4o-mini",
+			Temperature: 0.0,
+		}),
+		agent.WithBehavior[AddNumbersResult]("Add numbers using the add tool"),
+		agent.WithSystemPrompt[AddNumbersResult](customPrompt),
+		agent.WithTool[AddNumbersResult]("add", createTestAddTool()),
+	)
+	require.NoError(t, err)
+
+	input := AddNumbers{Num1: 1, Num2: 2}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	result, err := testAgent.Run(ctx, input)
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.NotNil(t, result.Data)
+	assert.Equal(t, 3, result.Data.Sum)
+}
+
+func TestNewAgentResult(t *testing.T) {
+	data := &AddNumbersResult{Sum: 10}
+	messages := []llm.LLMMessage{
+		llm.NewLLMMessage(llm.LLMMessageTypeUser, "Test message"),
+	}
+
+	result, err := agent.NewAgentResult(data, messages)
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, data, result.Data)
+	assert.Equal(t, messages, result.Messages)
+}
+
+func TestNewAgentResult_NilData(t *testing.T) {
+	messages := []llm.LLMMessage{
+		llm.NewLLMMessage(llm.LLMMessageTypeUser, "Test message"),
+	}
+
+	result, err := agent.NewAgentResult[AddNumbersResult](nil, messages)
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, agent.ErrInvalidResultSchema)
+	assert.Nil(t, result)
+}
+
+func TestNewAgentResult_EmptyMessages(t *testing.T) {
+	data := &AddNumbersResult{Sum: 10}
+
+	result, err := agent.NewAgentResult(data, []llm.LLMMessage{})
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, agent.ErrInvalidResultSchema)
+	assert.Nil(t, result)
+}
+
+func createTestAddTool() llm.LLMTool {
+	return llm.NewLLMTool(
+		llm.WithLLMToolName("add"),
+		llm.WithLLMToolDescription("Adds two numbers"),
+		llm.WithLLMToolParametersSchema[AddToolParams](),
+		llm.WithLLMToolCall(func(callID string, params AddToolParams) (AddToolResult, error) {
+			return AddToolResult{
+				BaseLLMToolResult: llm.BaseLLMToolResult{ID: callID},
+				Sum:               params.Num1 + params.Num2,
+			}, nil
+		}),
+	)
+}
