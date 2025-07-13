@@ -1,4 +1,7 @@
 
+build:
+	go build ./pkg/goagent/...
+
 lint:
 	golangci-lint run
 
@@ -9,3 +12,5 @@ test:
 		go test -v -coverprofile=coverage.out ./...; \
 	fi
 	go tool cover -func=coverage.out
+
+.PHONY: build lint test

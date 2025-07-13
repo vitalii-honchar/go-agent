@@ -1,12 +1,15 @@
 # Go Agent
 
-A Go library for building AI agents with configurable behavior, tools, and output schemas.
+> 📖 **Featured Blog Post**: [Building AI Agents in Go: A Comprehensive Guide](https://vitaliihonchar.com/insights/go-ai-agent-library) - Learn about the design principles and real-world applications of this library.
+
+A powerful, production-ready Go library for building AI agents with configurable behavior, custom tools, and type-safe output schemas. Perfect for building intelligent automation, data analysis tools, web scrapers, and AI-powered applications.
 
 [![CI](https://github.com/vitalii-honchar/go-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/vitalii-honchar/go-agent/actions/workflows/ci.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/vitalii-honchar/go-agent)](https://goreportcard.com/report/github.com/vitalii-honchar/go-agent)
 [![GoDoc](https://godoc.org/github.com/vitalii-honchar/go-agent?status.svg)](https://godoc.org/github.com/vitalii-honchar/go-agent)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## Features
+## ✨ Features
 
 - 🤖 **Generic AI Agents** - Type-safe agents with custom output schemas
 - 🔧 **Extensible Tools** - Add custom tools with automatic limit enforcement
@@ -15,8 +18,9 @@ A Go library for building AI agents with configurable behavior, tools, and outpu
 - ⚡ **Tool Limits** - Prevent runaway execution with per-tool usage limits
 - 📝 **Structured Output** - JSON schema validation for reliable results
 - 🛡️ **Type Safety** - Full Go generics support for compile-time safety
+- 🏗️ **Clean Architecture** - Interface-based design following Go best practices
 
-## Quick Start
+## 🚀 Quick Start
 
 ### Installation
 
@@ -69,438 +73,98 @@ func main() {
 }
 ```
 
-## Advanced Usage
+## 📚 Real-World Examples
 
-### Adding Custom Tools
+Explore our comprehensive examples in the [`examples/`](./examples/) directory, showcasing practical implementations:
 
-```go
-// Define tool parameters
-type AddToolParams struct {
-    Num1 float64 `json:"num1" jsonschema_description:"First number to add"`
-    Num2 float64 `json:"num2" jsonschema_description:"Second number to add"`
-}
+### 1. Increment Agent - Sequential Tool Calls
 
-type AddResult struct {
-    llm.BaseLLMToolResult
-    Sum float64 `json:"sum" jsonschema_description:"Sum of the two numbers"`
-}
-
-// Create a custom tool
-addTool := llm.NewLLMTool(
-    llm.WithLLMToolName("add"),
-    llm.WithLLMToolDescription("Adds two numbers together"),
-    llm.WithLLMToolParametersSchema[AddToolParams](),
-    llm.WithLLMToolCall(func(callID string, params AddToolParams) (AddResult, error) {
-        return AddResult{
-            BaseLLMToolResult: llm.BaseLLMToolResult{ID: callID},
-            Sum:              params.Num1 + params.Num2,
-        }, nil
-    }),
-)
-
-// Add tool to agent with usage limit
-calculatorAgent, err := agent.NewAgent(
-    agent.WithName[CalculatorResult]("calculator"),
-    agent.WithLLMConfig[CalculatorResult](llmConfig),
-    agent.WithBehavior[CalculatorResult]("Use the add tool to calculate sums. Do not calculate manually."),
-    agent.WithTool[CalculatorResult]("add", addTool),
-    agent.WithToolLimit[CalculatorResult]("add", 5), // Max 5 calls
-)
-```
-
-### Tool Limits
-
-Control tool usage to prevent runaway execution:
+The [increment-agent](./examples/increment-agent/main.go) demonstrates how to build an agent that makes sequential tool calls to perform calculations:
 
 ```go
-agent, err := agent.NewAgent(
-    // ... other options
-    agent.WithDefaultToolLimit[MyResult](3),           // Default limit for all tools
-    agent.WithToolLimit[MyResult]("expensive_tool", 1), // Specific limit for one tool
-)
-```
-
-### Custom System Prompts
-
-```go
-customPrompt := agent.NewPrompt(`
-You are {{.agent_name}} with the following tools: {{.tools}}.
-Your behavior: {{.behavior}}
-Output format: {{.output_schema}}
-`)
-
-agent, err := agent.NewAgent(
-    // ... other options
-    agent.WithSystemPrompt[MyResult](customPrompt),
-)
-```
-
-## Configuration
-
-### Environment Variables
-
-Set your API keys and configuration:
-
-```bash
-export OPENAI_API_KEY="your-openai-api-key"
-export OPENAI_MODEL="gpt-4"                    # Optional, defaults to gpt-4
-export OPENAI_TEMPERATURE="0.0"               # Optional, defaults to 0.7
-export OPENAI_MAX_TOKENS="4096"              # Optional, defaults to 4096
-export OPENAI_TIMEOUT_SECONDS="30"           # Optional, defaults to 30
-```
-
-Or use a `.env` file:
-
-```
-OPENAI_API_KEY=your-openai-api-key
-OPENAI_MODEL=gpt-4
-OPENAI_TEMPERATURE=0.0
-```
-
-### LLM Configuration
-
-```go
-config := llm.LLMConfig{
-    Type:        llm.LLMTypeOpenAI,
-    APIKey:      "your-api-key",
-    Model:       "gpt-4",
-    Temperature: 0.1,
-}
-```
-
-## Examples
-
-### Basic Calculator Agent
-
-Here's a simple calculator agent that uses a tool to perform addition:
-
-```go
-package main
-
-import (
-    "context"
-    "fmt"
-    "log"
-    "os"
-    
-    "github.com/vitalii-honchar/go-agent/pkg/goagent/agent"
-    "github.com/vitalii-honchar/go-agent/pkg/goagent/llm"
-)
-
-// Define input and output types
-type AddNumbers struct {
-    Num1 int `json:"num1" jsonschema_description:"First number to add"`
-    Num2 int `json:"num2" jsonschema_description:"Second number to add"`
-}
-
-type AddNumbersResult struct {
-    Sum int `json:"sum" jsonschema_description:"Sum of the two numbers"`
-}
-
-// Define tool parameters and result
-type AddToolParams struct {
-    Num1 float64 `json:"num1" jsonschema_description:"First number to add"`
-    Num2 float64 `json:"num2" jsonschema_description:"Second number to add"`
-}
-
-type AddToolResult struct {
-    llm.BaseLLMToolResult
-    Sum float64 `json:"sum" jsonschema_description:"Sum of the two numbers"`
-}
-
-func main() {
-    // Create an addition tool
-    addTool := llm.NewLLMTool(
-        llm.WithLLMToolName("add"),
-        llm.WithLLMToolDescription("Adds two numbers together"),
-        llm.WithLLMToolParametersSchema[AddToolParams](),
-        llm.WithLLMToolCall(func(callID string, params AddToolParams) (AddToolResult, error) {
-            return AddToolResult{
-                BaseLLMToolResult: llm.BaseLLMToolResult{ID: callID},
-                Sum:              params.Num1 + params.Num2,
-            }, nil
-        }),
-    )
-
-    // Create calculator agent
-    calculatorAgent, err := agent.NewAgent(
-        agent.WithName[AddNumbersResult]("calculator"),
-        agent.WithLLMConfig[AddNumbersResult](llm.LLMConfig{
-            Type:        llm.LLMTypeOpenAI,
-            APIKey:      os.Getenv("OPENAI_API_KEY"),
-            Model:       "gpt-4",
-            Temperature: 0.0,
-        }),
-        agent.WithBehavior[AddNumbersResult](
-            "You are a calculator agent. You MUST use the add tool to calculate the sum of the two provided numbers. " +
-                "Do NOT calculate manually. Return the result in the specified JSON format."),
-        agent.WithTool[AddNumbersResult]("add", addTool),
-        agent.WithToolLimit[AddNumbersResult]("add", 1),
-    )
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    // Run the agent
-    input := AddNumbers{Num1: 3, Num2: 5}
-    result, err := calculatorAgent.Run(context.Background(), input)
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    fmt.Printf("Result: %d + %d = %d\n", input.Num1, input.Num2, result.Data.Sum)
-}
-```
-
-### Sequential Tool Calls
-
-This example shows an agent that makes multiple sequential tool calls:
-
-```go
-// Define types for incremental operations
-type IncrementInput struct {
-    StartNumber int `json:"start_number" jsonschema_description:"Starting number for increment"`
-    Steps       int `json:"steps" jsonschema_description:"Number of steps to increment"`
-}
-
+// Agent that starts with a number and increments it using tool calls
 type IncrementResult struct {
     FinalNumber int      `json:"final_number" jsonschema_description:"Final result after all increments"`
-    Steps       []string `json:"steps" jsonschema_description:"List of steps taken to reach the final number"`
+    Steps       []string `json:"steps"        jsonschema_description:"List of steps taken"`
 }
 
-func createIncrementAgent() (*agent.Agent[IncrementResult], error) {
-    // Create the same add tool as above
-    addTool := llm.NewLLMTool(
-        llm.WithLLMToolName("add"),
-        llm.WithLLMToolDescription("Adds two numbers together"),
-        llm.WithLLMToolParametersSchema[AddToolParams](),
-        llm.WithLLMToolCall(func(callID string, params AddToolParams) (AddToolResult, error) {
-            return AddToolResult{
-                BaseLLMToolResult: llm.BaseLLMToolResult{ID: callID},
-                Sum:              params.Num1 + params.Num2,
-            }, nil
-        }),
-    )
-
-    return agent.NewAgent(
-        agent.WithName[IncrementResult]("incrementer"),
-        agent.WithLLMConfig[IncrementResult](llm.LLMConfig{
-            Type:        llm.LLMTypeOpenAI,
-            APIKey:      os.Getenv("OPENAI_API_KEY"),
-            Model:       "gpt-4",
-            Temperature: 0.0,
-        }),
-        agent.WithBehavior[IncrementResult](`You are an incrementer agent. You must:
-1. Start with the provided start_number
-2. Use the add tool to add 1 to it (steps times)
-3. For 3 steps: call add(start_number, 1), then add(result, 1), then add(result, 1)
-4. Track each step showing the calculation
-5. Return the final number and all steps taken
-
-You MUST use the add tool for each increment. Do NOT calculate manually.`),
-        agent.WithTool[IncrementResult]("add", addTool),
-        agent.WithToolLimit[IncrementResult]("add", 5),
-    )
-}
-
-func main() {
-    incrementAgent, err := createIncrementAgent()
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    input := IncrementInput{StartNumber: 2, Steps: 3}
-    result, err := incrementAgent.Run(context.Background(), input)
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    fmt.Printf("Started with: %d\n", input.StartNumber)
-    fmt.Printf("Final result: %d\n", result.Data.FinalNumber)
-    fmt.Printf("Steps taken: %v\n", result.Data.Steps)
-}
-```
-
-### Multi-Tool Agent
-
-This example demonstrates using multiple tools with different limits:
-
-```go
-// Hash tool types
-type HashToolParams struct {
-    Input string `json:"input" jsonschema_description:"Text to hash"`
-}
-
-type HashToolResult struct {
-    llm.BaseLLMToolResult
-    Hash string `json:"hash" jsonschema_description:"SHA256 hash of the input text"`
-}
-
-func createMultiToolAgent() (*agent.Agent[IncrementResult], error) {
-    // Create add tool (same as above)
-    addTool := llm.NewLLMTool(
-        llm.WithLLMToolName("add"),
-        llm.WithLLMToolDescription("Adds two numbers together"),
-        llm.WithLLMToolParametersSchema[AddToolParams](),
-        llm.WithLLMToolCall(func(callID string, params AddToolParams) (AddToolResult, error) {
-            return AddToolResult{
-                BaseLLMToolResult: llm.BaseLLMToolResult{ID: callID},
-                Sum:              params.Num1 + params.Num2,
-            }, nil
-        }),
-    )
-
-    // Create hash tool
-    hashTool := llm.NewLLMTool(
-        llm.WithLLMToolName("hash"),
-        llm.WithLLMToolDescription("Computes SHA256 hash of input string"),
-        llm.WithLLMToolParametersSchema[HashToolParams](),
-        llm.WithLLMToolCall(func(callID string, params HashToolParams) (HashToolResult, error) {
-            hash := fmt.Sprintf("%x", []byte(params.Input))
-            return HashToolResult{
-                BaseLLMToolResult: llm.BaseLLMToolResult{ID: callID},
-                Hash:              hash,
-            }, nil
-        }),
-    )
-
-    return agent.NewAgent(
-        agent.WithName[IncrementResult]("multi-tool-tester"),
-        agent.WithLLMConfig[IncrementResult](llm.LLMConfig{
-            Type:        llm.LLMTypeOpenAI,
-            APIKey:      os.Getenv("OPENAI_API_KEY"),
-            Model:       "gpt-4",
-            Temperature: 0.0,
-        }),
-        agent.WithBehavior[IncrementResult](`You are a multi-tool testing agent. You must:
-1. Start with the provided start_number (10)
-2. Use the add tool exactly 3 times to add 2 each time: add(10,2), add(12,2), add(14,2) 
-3. Then use the hash tool to compute hash of "test"
-4. Track each step and return final number
-
-You have add tool limit of 3 and hash tool limit of 1. Use add tool 3 times, then hash tool 1 time.`),
-        agent.WithTool[IncrementResult]("add", addTool),
-        agent.WithTool[IncrementResult]("hash", hashTool),
-        agent.WithToolLimit[IncrementResult]("add", 3),
-        agent.WithToolLimit[IncrementResult]("hash", 1),
-    )
-}
-```
-
-### Tool Limits and Error Handling
-
-This example shows how to handle tool limits:
-
-```go
-import (
-    "context"
-    "errors"
-    "fmt"
-    "log"
-    "os"
-    
-    "github.com/vitalii-honchar/go-agent/pkg/goagent/agent"
-    "github.com/vitalii-honchar/go-agent/pkg/goagent/llm"
-)
-
-func createLimitedAgent() (*agent.Agent[IncrementResult], error) {
-    addTool := llm.NewLLMTool(
-        llm.WithLLMToolName("add"),
-        llm.WithLLMToolDescription("Adds two numbers together"),
-        llm.WithLLMToolParametersSchema[AddToolParams](),
-        llm.WithLLMToolCall(func(callID string, params AddToolParams) (AddToolResult, error) {
-            return AddToolResult{
-                BaseLLMToolResult: llm.BaseLLMToolResult{ID: callID},
-                Sum:              params.Num1 + params.Num2,
-            }, nil
-        }),
-    )
-
-    return agent.NewAgent(
-        agent.WithName[IncrementResult]("limit-tester"),
-        agent.WithLLMConfig[IncrementResult](llm.LLMConfig{
-            Type:        llm.LLMTypeOpenAI,
-            APIKey:      os.Getenv("OPENAI_API_KEY"),
-            Model:       "gpt-4",
-            Temperature: 0.0,
-        }),
-        agent.WithBehavior[IncrementResult](`You are a calculation agent that can ONLY perform arithmetic using the add tool. 
-You have no ability to calculate numbers manually.
-
-Your task: You need to increment the start_number by adding complex floating point numbers that you cannot calculate yourself.
-
-Process:
-1. Use add tool to add start_number + 0.12345
-2. Use add tool to add result + 0.23456  
-3. Use add tool to add result + 0.34567
-4. Use add tool to add result + 0.45678
-5. Use add tool to add result + 0.56789
-
-You MUST use the add tool for each step because these floating point calculations are too complex for you to do manually. 
-Do not try to calculate yourself - you will get wrong results. Always use the add tool.`),
-        agent.WithTool[IncrementResult]("add", addTool),
-        agent.WithToolLimit[IncrementResult]("add", 1), // Very restrictive limit
-    )
-}
-
-func main() {
-    limitedAgent, err := createLimitedAgent()
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    input := IncrementInput{StartNumber: 100, Steps: 3}
-    result, err := limitedAgent.Run(context.Background(), input)
-    
-    // Check if limit was reached
-    if err != nil {
-        if errors.Is(err, agent.ErrLimitReached) {
-            fmt.Printf("Tool limit reached as expected: %v\n", err)
-            fmt.Printf("Partial result available: %v\n", result != nil)
-            fmt.Printf("Messages: %d\n", len(result.Messages))
-        } else {
-            log.Fatal(err)
-        }
-    } else {
-        fmt.Printf("Final result: %d\n", result.Data.FinalNumber)
-    }
-}
-```
-
-### Default Tool Limits
-
-You can set default limits for all tools:
-
-```go
-agent, err := agent.NewAgent(
-    agent.WithName[MyResult]("default-limit-agent"),
-    agent.WithLLMConfig[MyResult](llmConfig),
-    agent.WithBehavior[MyResult]("Your behavior here"),
-    agent.WithTool[MyResult]("tool1", tool1),
-    agent.WithTool[MyResult]("tool2", tool2),
-    agent.WithDefaultToolLimit[MyResult](2),              // Default limit for all tools
-    agent.WithToolLimit[MyResult]("tool1", 5),            // Override for specific tool
-    // tool2 will use the default limit of 2
+// Creates an agent that uses an "add" tool 3 times to increment by 2 each time
+incrementAgent, err := agent.NewAgent(
+    agent.WithName[IncrementResult]("increment-agent"),
+    agent.WithLLMConfig[IncrementResult](llmConfig),
+    agent.WithBehavior[IncrementResult]("You must use the add tool exactly 3 times to add 2 each time"),
+    agent.WithTool[IncrementResult]("add", addTool),
+    agent.WithToolLimit[IncrementResult]("add", 3),
 )
 ```
 
-### More Examples
+**Run it:**
+```bash
+cd examples/increment-agent
+export OPENAI_API_KEY="your-key"
+go run main.go
+```
 
-For additional usage patterns, check the comprehensive test suite in `pkg/goagent/agent/agent_test.go`:
+### 2. Site Analyzer Agent - HTTP Tool Integration
 
-- **TestSumAgent** - Basic calculator with tool usage
-- **TestHashAgent** - Text hashing with custom tools
-- **TestSequentialToolCalls** - Multiple sequential operations
-- **TestMultiToolLimitReached** - Multiple tools with different limits
-- **TestDefaultToolLimit** - Default tool limit configuration
-- **TestCustomDefaultToolLimit** - Custom default limits
+The [site-analyzer-agent](./examples/site-analyzer-agent/main.go) shows how to build agents that interact with external APIs and perform comprehensive analysis:
 
-## Architecture
+```go
+// Agent that analyzes websites by fetching and examining their content
+type AgentResult struct {
+    Title       string   `json:"title"        jsonschema_description:"Title of the site"`
+    Purpose     string   `json:"purpose"      jsonschema_description:"Purpose of the site"`
+    KeyInsights []string `json:"key_insights" jsonschema_description:"Key insights about the site"`
+}
+
+// Creates an agent with HTTP tool to fetch and analyze web content
+analyzerAgent, err := agent.NewAgent(
+    agent.WithName[AgentResult]("analyzer-agent"),
+    agent.WithLLMConfig[AgentResult](llmConfig),
+    agent.WithBehavior[AgentResult](websiteAnalysisBehavior),
+    agent.WithTool[AgentResult]("http", httpTool),
+    agent.WithToolLimit[AgentResult]("http", 10),
+)
+```
+
+**Run it:**
+```bash
+cd examples/site-analyzer-agent
+export OPENAI_API_KEY="your-key"
+go run main.go
+```
+
+## 🛠️ Development
+
+### Prerequisites
+
+- Go 1.24.4+
+- OpenAI API key for testing
+
+### Building
+
+```bash
+make build
+```
+
+### Testing
+
+```bash
+make test
+```
+
+### Linting
+
+```bash
+make lint
+```
+
+## 🏗️ Architecture
 
 ### Core Components
 
 - **Agent** - Main orchestrator with configurable behavior and tools
-- **LLM** - Abstraction layer for different language model providers
+- **LLM** - Abstraction layer for different language model providers  
 - **Tools** - Extensible functions that agents can call
 - **Config** - Environment-based configuration management
 
@@ -511,44 +175,7 @@ For additional usage patterns, check the comprehensive test suite in `pkg/goagen
 - **Dependency Injection** - Flexible configuration with options pattern
 - **Error Handling** - Explicit error types and proper error wrapping
 
-## Development
-
-### Prerequisites
-
-- Go 1.24.4+
-- OpenAI API key for testing
-
-### Building
-
-```bash
-go build ./pkg/goagent/...
-```
-
-### Testing
-
-```bash
-make test
-# or
-go test ./... -v
-```
-
-### Linting
-
-```bash
-make lint
-# or
-go vet ./...
-```
-
-### Running Examples
-
-Examples are coming soon! Check the test files for usage patterns:
-
-```bash
-go test ./pkg/goagent/agent -v
-```
-
-## Contributing
+## 🤝 Contributing
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
@@ -567,20 +194,25 @@ go test ./pkg/goagent/agent -v
 - Follow Go best practices and idioms
 - Use the provided linter configuration
 
-## License
+## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Changelog
+## 🌟 Why Choose Go Agent?
 
-See [CHANGELOG.md](CHANGELOG.md) for version history and breaking changes.
+- **Production Ready** - Used in real-world applications with robust error handling
+- **Developer Friendly** - Intuitive API design with comprehensive examples
+- **Extensible** - Easy to add custom tools and integrate with external services
+- **Type Safe** - Leverage Go's type system for reliable agent development
+- **Well Tested** - Comprehensive test suite with high code coverage
 
-## Support
+## 📬 Stay Connected
 
-- 📖 [Documentation](https://godoc.org/github.com/vitalii-honchar/go-agent)
-- 🐛 [Issue Tracker](https://github.com/vitalii-honchar/go-agent/issues)
-- 💬 [Discussions](https://github.com/vitalii-honchar/go-agent/discussions)
+- 📖 [Blog](https://vitaliihonchar.com) - Technical articles and insights
+- 📧 [Newsletter](https://vitaliihonchar.substack.com/) - Subscribe for updates on Go, AI, and software engineering
+- 🐛 [Issue Tracker](https://github.com/vitalii-honchar/go-agent/issues) - Report bugs and feature requests
+- 💬 [Discussions](https://github.com/vitalii-honchar/go-agent/discussions) - Community discussions
 
 ---
 
-Built with ❤️ for the Go community
+**Built with ❤️ for the Go community**
