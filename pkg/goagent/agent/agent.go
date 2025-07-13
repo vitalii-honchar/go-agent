@@ -1,4 +1,56 @@
-// Package agent provides AI agent functionality with configurable behavior, tools, and output schemas
+// Package agent provides AI agent functionality with configurable behavior, tools, and output schemas.
+//
+// This package enables building type-safe AI agents that can use custom tools and produce
+// structured outputs. Agents are built using the options pattern for flexible configuration.
+//
+// Basic Usage:
+//
+//	type MyResult struct {
+//		Answer string `json:"answer" jsonschema_description:"The calculated answer"`
+//	}
+//
+//	agent, err := agent.NewAgent(
+//		agent.WithName[MyResult]("my-agent"),
+//		agent.WithLLMConfig[MyResult](llm.LLMConfig{
+//			Type:        llm.LLMTypeOpenAI,
+//			APIKey:      "your-api-key",
+//			Model:       "gpt-4",
+//			Temperature: 0.0,
+//		}),
+//		agent.WithBehavior[MyResult]("You are a helpful assistant."),
+//	)
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//
+//	result, err := agent.Run(context.Background(), "Hello, world!")
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	fmt.Println(result.Data.Answer)
+//
+// Tool Integration:
+//
+// Agents can use custom tools to extend their capabilities:
+//
+//	tool := llm.NewLLMTool(
+//		llm.WithLLMToolName("calculator"),
+//		llm.WithLLMToolDescription("Performs arithmetic calculations"),
+//		llm.WithLLMToolParametersSchema[CalculatorParams](),
+//		llm.WithLLMToolCall(func(id string, params CalculatorParams) (CalculatorResult, error) {
+//			// Tool implementation
+//			return CalculatorResult{Sum: params.A + params.B}, nil
+//		}),
+//	)
+//
+//	agent, err := agent.NewAgent(
+//		// ... other options
+//		agent.WithTool[MyResult]("calculator", tool),
+//		agent.WithToolLimit[MyResult]("calculator", 5), // Limit tool usage
+//	)
+//
+// The package supports tool usage limits to prevent runaway execution and provides
+// comprehensive error handling with typed errors for different failure scenarios.
 package agent
 
 import (
@@ -86,7 +138,37 @@ type Agent[T any] struct {
 // AgentOption is a function that configures an Agent
 type AgentOption[T any] func(*Agent[T])
 
-// NewAgent creates a new Agent with the given options
+// NewAgent creates a new Agent with the given options.
+//
+// The agent is configured using the options pattern for maximum flexibility.
+// Required options include WithName and WithLLMConfig. Optional options include
+// WithBehavior, WithTool, WithToolLimit, and WithSystemPrompt.
+//
+// Example:
+//
+//	type MyResult struct {
+//		Answer   string `json:"answer" jsonschema_description:"The answer"`
+//		Thoughts string `json:"thoughts" jsonschema_description:"Reasoning process"`
+//	}
+//
+//	agent, err := NewAgent(
+//		WithName[MyResult]("calculator-agent"),
+//		WithLLMConfig[MyResult](llm.LLMConfig{
+//			Type:        llm.LLMTypeOpenAI,
+//			APIKey:      os.Getenv("OPENAI_API_KEY"),
+//			Model:       "gpt-4",
+//			Temperature: 0.1,
+//		}),
+//		WithBehavior[MyResult]("You are a precise calculator. Show your work."),
+//		WithTool[MyResult]("add", addTool),
+//		WithToolLimit[MyResult]("add", 5),
+//	)
+//
+// The type parameter T specifies the expected output schema. The agent will
+// validate that the LLM's response matches this schema before returning it.
+//
+// Returns an error if required options are missing or if the agent configuration
+// is invalid (e.g., empty behavior, missing LLM config).
 func NewAgent[T any](options ...AgentOption[T]) (*Agent[T], error) {
 	agent := &Agent[T]{
 		tools:            make(map[string]llm.LLMTool),
