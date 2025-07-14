@@ -300,15 +300,6 @@ func (a *AgentState) AddMessage(msg llm.LLMMessage) {
 	a.Messages = append(a.Messages, msg)
 }
 
-// GetToolLimit returns the usage limit for a specific tool
-func (a *Agent[T]) GetToolLimit(name string) int {
-	if limit, exists := a.limits[name]; exists {
-		return limit
-	}
-
-	return a.defaultToolLimit
-}
-
 // Run executes the agent with the given input and returns the result
 func (a *Agent[T]) Run(ctx context.Context, input any) (*AgentResult[T], error) {
 	state, err := a.createInitState(input)
@@ -355,6 +346,14 @@ func (a *Agent[T]) Run(ctx context.Context, input any) (*AgentResult[T], error) 
 
 		state.Messages[0].Content = newSystemPrompt
 	}
+}
+
+func (a *Agent[T]) getToolLimit(name string) int {
+	if limit, exists := a.limits[name]; exists {
+		return limit
+	}
+
+	return a.defaultToolLimit
 }
 
 func (a *Agent[T]) createInitState(input any) (*AgentState, error) {
@@ -413,7 +412,7 @@ func (a *Agent[T]) callTools(llmMessage llm.LLMMessage, usage map[string]int) ([
 			return nil, fmt.Errorf("%w: %s", ErrToolNotFound, toolCall.ToolName)
 		}
 
-		limit := a.GetToolLimit(toolCall.ToolName)
+		limit := a.getToolLimit(toolCall.ToolName)
 		if usage[toolCall.ToolName] >= limit {
 			return nil, ErrLimitReached
 		}
