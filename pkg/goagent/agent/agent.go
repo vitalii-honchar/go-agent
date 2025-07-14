@@ -1,53 +1,103 @@
-// Package agent provides AI agent functionality with configurable behavior, tools, and output schemas.
+// Package agent provides a powerful, production-ready Go library for building AI agents
+// with configurable behavior, custom tools, and type-safe output schemas.
 //
-// This package enables building type-safe AI agents that can use custom tools and produce
-// structured outputs. Agents are built using the options pattern for flexible configuration.
+// This library is perfect for building intelligent automation, data analysis tools,
+// web scrapers, and AI-powered applications with robust error handling and clean architecture.
 //
-// Basic Usage:
+// Key Features:
 //
-//	type MyResult struct {
-//		Answer string `json:"answer" jsonschema_description:"The calculated answer"`
-//	}
+//   - Type-safe agents with custom output schemas using Go generics
+//   - Extensible tool system with automatic limit enforcement
+//   - Configurable agent behavior using natural language
+//   - Multiple LLM support (OpenAI, extensible to others)
+//   - Structured JSON output with schema validation
+//   - Production-ready with comprehensive error handling
 //
-//	agent, err := agent.NewAgent(
-//		agent.WithName[MyResult]("my-agent"),
-//		agent.WithLLMConfig[MyResult](llm.LLMConfig{
-//			Type:        llm.LLMTypeOpenAI,
-//			APIKey:      "your-api-key",
-//			Model:       "gpt-4",
-//			Temperature: 0.0,
-//		}),
-//		agent.WithBehavior[MyResult]("You are a helpful assistant."),
+// Quick Start:
+//
+// The easiest way to get started is to create a simple agent:
+//
+//	package main
+//
+//	import (
+//		"context"
+//		"fmt"
+//		"log"
+//
+//		"github.com/vitalii-honchar/go-agent/pkg/goagent/agent"
+//		"github.com/vitalii-honchar/go-agent/pkg/goagent/llm"
 //	)
-//	if err != nil {
-//		log.Fatal(err)
+//
+//	type Result struct {
+//		Answer string `json:"answer" jsonschema_description:"The answer"`
 //	}
 //
-//	result, err := agent.Run(context.Background(), "Hello, world!")
-//	if err != nil {
-//		log.Fatal(err)
+//	func main() {
+//		agent, err := agent.NewAgent(
+//			agent.WithName[Result]("my-agent"),
+//			agent.WithLLMConfig[Result](llm.LLMConfig{
+//				Type:        llm.LLMTypeOpenAI,
+//				APIKey:      "your-openai-api-key",
+//				Model:       "gpt-4",
+//				Temperature: 0.0,
+//			}),
+//			agent.WithBehavior[Result]("You are a helpful assistant."),
+//		)
+//		if err != nil {
+//			log.Fatal(err)
+//		}
+//
+//		result, err := agent.Run(context.Background(), "What is 2+2?")
+//		if err != nil {
+//			log.Fatal(err)
+//		}
+//
+//		fmt.Println("Answer:", result.Data.Answer)
 //	}
-//	fmt.Println(result.Data.Answer)
 //
 // Tool Integration:
 //
 // Agents can use custom tools to extend their capabilities:
 //
+//	type MyToolParams struct {
+//		Input string `json:"input" jsonschema_description:"Input to process"`
+//	}
+//
+//	type MyToolResult struct {
+//		llm.BaseLLMToolResult
+//		Output string `json:"output" jsonschema_description:"Processed output"`
+//	}
+//
 //	tool := llm.NewLLMTool(
-//		llm.WithLLMToolName("calculator"),
-//		llm.WithLLMToolDescription("Performs arithmetic calculations"),
-//		llm.WithLLMToolParametersSchema[CalculatorParams](),
-//		llm.WithLLMToolCall(func(id string, params CalculatorParams) (CalculatorResult, error) {
-//			// Tool implementation
-//			return CalculatorResult{Sum: params.A + params.B}, nil
+//		llm.WithLLMToolName("my-tool"),
+//		llm.WithLLMToolDescription("Processes input and returns output"),
+//		llm.WithLLMToolParametersSchema[MyToolParams](),
+//		llm.WithLLMToolCall(func(callID string, params MyToolParams) (MyToolResult, error) {
+//			// Process params.Input
+//			return MyToolResult{
+//				BaseLLMToolResult: llm.BaseLLMToolResult{ID: callID},
+//				Output:            processedOutput,
+//			}, nil
 //		}),
 //	)
 //
 //	agent, err := agent.NewAgent(
 //		// ... other options
-//		agent.WithTool[MyResult]("calculator", tool),
-//		agent.WithToolLimit[MyResult]("calculator", 5), // Limit tool usage
+//		agent.WithTool[MyResult]("my-tool", tool),
+//		agent.WithToolLimit[MyResult]("my-tool", 5), // Limit tool usage
 //	)
+//
+// Package Structure:
+//
+//   - agent: Core agent functionality and orchestration
+//   - llm: LLM abstractions and tool system
+//   - config: Environment-based configuration management
+//
+// For comprehensive examples and advanced usage, see:
+// https://github.com/vitalii-honchar/go-agent/tree/main/examples
+//
+// Documentation and tutorials:
+// https://vitaliihonchar.com/insights/go-ai-agent-library
 //
 // The package supports tool usage limits to prevent runaway execution and provides
 // comprehensive error handling with typed errors for different failure scenarios.
