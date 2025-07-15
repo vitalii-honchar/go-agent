@@ -488,7 +488,7 @@ func createHashTool(t *testing.T) (*int64, llm.LLMTool) {
 		llm.WithLLMToolName("hash"),
 		llm.WithLLMToolDescription("Computes SHA256 hash of input string"),
 		llm.WithLLMToolParametersSchema[HashToolParams](),
-		llm.WithLLMToolCall[HashToolParams, HashToolResult](
+		llm.WithLLMToolCall(
 			func(callID string, params HashToolParams) (HashToolResult, error) {
 				callCount := atomic.AddInt64(counter, 1)
 				t.Logf("🔧 TOOL CALL #%d: hash(input='%s')", callCount, params.Input)
@@ -598,4 +598,250 @@ func createTestAddTool() llm.LLMTool {
 	}
 
 	return tool
+}
+
+func TestMiddlewareLogging(t *testing.T) {
+	t.Parallel()
+
+	apiKey := os.Getenv("OPENAI_API_KEY")
+	require.NotEmpty(t, apiKey, "OPENAI_API_KEY environment variable must be set")
+
+	// Create a logging middleware that tracks LLM calls
+	var logEntries []string
+	loggingMiddleware := func(ctx context.Context, state *agent.AgentState, llmMessage llm.LLMMessage) (llm.LLMMessage, error) {
+		logEntries = append(logEntries, fmt.Sprintf("LLM Response: content_length=%d, tool_calls=%d",
+			len(llmMessage.Content), len(llmMessage.ToolCalls)))
+
+		return llmMessage, nil
+	}
+
+	toolCallCounter, addTool := createAddTool(t)
+	loggingAgent, err := agent.NewAgent(
+		agent.WithName[AddNumbersResult]("logging_agent"),
+		agent.WithLLMConfig[AddNumbersResult](llm.LLMConfig{
+			Type:        llm.LLMTypeOpenAI,
+			APIKey:      apiKey,
+			Model:       "gpt-4o-mini",
+			Temperature: 0.0,
+		}),
+		agent.WithBehavior[AddNumbersResult]("You are a calculator. Use the add tool to calculate 5+3."),
+		agent.WithTool[AddNumbersResult]("add", addTool),
+		agent.WithMiddleware[AddNumbersResult](loggingMiddleware),
+	)
+	require.NoError(t, err)
+
+	input := AddNumbers{Num1: 5, Num2: 3}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	t.Logf("🚀 Starting logging middleware test")
+
+	result, err := loggingAgent.Run(ctx, input)
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.NotNil(t, result.Data)
+	assert.Equal(t, 8, result.Data.Sum)
+
+	// Verify logging middleware was called
+	assert.NotEmpty(t, logEntries, "Logging middleware should have recorded entries")
+	assert.NotEmpty(t, logEntries, "Should have at least one log entry")
+
+	finalCount := atomic.LoadInt64(toolCallCounter)
+	assert.Equal(t, int64(1), finalCount, "Add tool should have been called exactly once")
+
+	t.Logf("🔧 Tool called %d times", finalCount)
+	t.Logf("📝 Log entries: %v", logEntries)
+	t.Logf("✅ Final result: %d", result.Data.Sum)
+}
+
+func TestMiddlewareRBAC(t *testing.T) {
+	t.Parallel()
+
+	apiKey := os.Getenv("OPENAI_API_KEY")
+	require.NotEmpty(t, apiKey, "OPENAI_API_KEY environment variable must be set")
+
+	// Create an RBAC middleware that blocks certain operations
+	rbacMiddleware := func(ctx context.Context, state *agent.AgentState, llmMessage llm.LLMMessage) (llm.LLMMessage, error) {
+		// Simulate checking for forbidden operations
+		if len(llmMessage.ToolCalls) > 0 {
+			for _, toolCall := range llmMessage.ToolCalls {
+				if toolCall.ToolName == "add" {
+					// Simulate RBAC rejection
+					return llm.LLMMessage{}, agent.ErrAccessDenied
+				}
+			}
+		}
+
+		return llmMessage, nil
+	}
+
+	toolCallCounter, addTool := createAddTool(t)
+	rbacAgent, err := agent.NewAgent(
+		agent.WithName[AddNumbersResult]("rbac_agent"),
+		agent.WithLLMConfig[AddNumbersResult](llm.LLMConfig{
+			Type:        llm.LLMTypeOpenAI,
+			APIKey:      apiKey,
+			Model:       "gpt-4o-mini",
+			Temperature: 0.0,
+		}),
+		agent.WithBehavior[AddNumbersResult]("You are a calculator. Use the add tool to calculate 2+2."),
+		agent.WithTool[AddNumbersResult]("add", addTool),
+		agent.WithMiddleware[AddNumbersResult](rbacMiddleware),
+	)
+	require.NoError(t, err)
+
+	input := AddNumbers{Num1: 2, Num2: 2}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	t.Logf("🚀 Starting RBAC middleware test (should fail with access denied)")
+
+	result, err := rbacAgent.Run(ctx, input)
+
+	// Should fail due to RBAC middleware blocking access
+	require.Error(t, err)
+	require.ErrorIs(t, err, agent.ErrMiddlewareError)
+	assert.Contains(t, err.Error(), "access denied")
+	assert.Nil(t, result)
+
+	// Tool should not have been called due to middleware blocking
+	finalCount := atomic.LoadInt64(toolCallCounter)
+	assert.Equal(t, int64(0), finalCount, "Add tool should not have been called due to RBAC block")
+
+	t.Logf("🔧 Tool called %d times (blocked by RBAC)", finalCount)
+	t.Logf("✅ RBAC correctly blocked access: %v", err)
+}
+
+func TestMiddlewareMessageModification(t *testing.T) {
+	t.Parallel()
+
+	apiKey := os.Getenv("OPENAI_API_KEY")
+	require.NotEmpty(t, apiKey, "OPENAI_API_KEY environment variable must be set")
+
+	// Create a middleware that modifies LLM responses
+	var originalContent string
+	var modifiedContent string
+	modificationMiddleware := func(ctx context.Context, state *agent.AgentState, llmMessage llm.LLMMessage) (llm.LLMMessage, error) {
+		originalContent = llmMessage.Content
+		// Add a prefix to the LLM response content
+		llmMessage.Content = "[MODIFIED] " + llmMessage.Content
+		modifiedContent = llmMessage.Content
+
+		return llmMessage, nil
+	}
+
+	toolCallCounter, addTool := createAddTool(t)
+	modificationAgent, err := agent.NewAgent(
+		agent.WithName[AddNumbersResult]("modification_agent"),
+		agent.WithLLMConfig[AddNumbersResult](llm.LLMConfig{
+			Type:        llm.LLMTypeOpenAI,
+			APIKey:      apiKey,
+			Model:       "gpt-4o-mini",
+			Temperature: 0.0,
+		}),
+		agent.WithBehavior[AddNumbersResult]("You are a calculator. Use the add tool to calculate 1+1."),
+		agent.WithTool[AddNumbersResult]("add", addTool),
+		agent.WithMiddleware[AddNumbersResult](modificationMiddleware),
+	)
+	require.NoError(t, err)
+
+	input := AddNumbers{Num1: 1, Num2: 1}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	t.Logf("🚀 Starting message modification middleware test")
+
+	result, err := modificationAgent.Run(ctx, input)
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.NotNil(t, result.Data)
+	assert.Equal(t, 2, result.Data.Sum)
+
+	// Verify message was modified
+	assert.NotEmpty(t, originalContent, "Should have captured original content")
+	assert.NotEmpty(t, modifiedContent, "Should have captured modified content")
+	assert.Contains(t, modifiedContent, "[MODIFIED]", "Modified content should contain prefix")
+	assert.NotEqual(t, originalContent, modifiedContent, "Content should have been modified")
+
+	finalCount := atomic.LoadInt64(toolCallCounter)
+	assert.Equal(t, int64(1), finalCount, "Add tool should have been called exactly once")
+
+	t.Logf("🔧 Tool called %d times", finalCount)
+	t.Logf("📝 Original content length: %d", len(originalContent))
+	t.Logf("📝 Modified content length: %d", len(modifiedContent))
+	t.Logf("✅ Final result: %d", result.Data.Sum)
+}
+
+func TestMiddlewareChaining(t *testing.T) {
+	t.Parallel()
+
+	apiKey := os.Getenv("OPENAI_API_KEY")
+	require.NotEmpty(t, apiKey, "OPENAI_API_KEY environment variable must be set")
+
+	// Create multiple middleware that modify content in sequence
+	var executionOrder []string
+
+	firstMiddleware := func(ctx context.Context, state *agent.AgentState, llmMessage llm.LLMMessage) (llm.LLMMessage, error) {
+		executionOrder = append(executionOrder, "first")
+		llmMessage.Content = "[FIRST] " + llmMessage.Content
+		return llmMessage, nil
+	}
+
+	secondMiddleware := func(ctx context.Context, state *agent.AgentState, llmMessage llm.LLMMessage) (llm.LLMMessage, error) {
+		executionOrder = append(executionOrder, "second")
+		llmMessage.Content = "[SECOND] " + llmMessage.Content
+		return llmMessage, nil
+	}
+
+	thirdMiddleware := func(ctx context.Context, state *agent.AgentState, llmMessage llm.LLMMessage) (llm.LLMMessage, error) {
+		executionOrder = append(executionOrder, "third")
+		llmMessage.Content = "[THIRD] " + llmMessage.Content
+		return llmMessage, nil
+	}
+
+	toolCallCounter, addTool := createAddTool(t)
+	chainingAgent, err := agent.NewAgent(
+		agent.WithName[AddNumbersResult]("chaining_agent"),
+		agent.WithLLMConfig[AddNumbersResult](llm.LLMConfig{
+			Type:        llm.LLMTypeOpenAI,
+			APIKey:      apiKey,
+			Model:       "gpt-4o-mini",
+			Temperature: 0.0,
+		}),
+		agent.WithBehavior[AddNumbersResult]("You are a calculator. Use the add tool to calculate 4+4."),
+		agent.WithTool[AddNumbersResult]("add", addTool),
+		agent.WithMiddleware[AddNumbersResult](firstMiddleware),
+		agent.WithMiddleware[AddNumbersResult](secondMiddleware),
+		agent.WithMiddleware[AddNumbersResult](thirdMiddleware),
+	)
+	require.NoError(t, err)
+
+	input := AddNumbers{Num1: 4, Num2: 4}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	t.Logf("🚀 Starting middleware chaining test")
+
+	result, err := chainingAgent.Run(ctx, input)
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.NotNil(t, result.Data)
+	assert.Equal(t, 8, result.Data.Sum)
+
+	// Verify middleware execution order
+	assert.NotEmpty(t, executionOrder, "Should have recorded middleware execution order")
+	// Middleware should execute in the order they were added
+	assert.Contains(t, executionOrder, "first", "First middleware should have executed")
+	assert.Contains(t, executionOrder, "second", "Second middleware should have executed")
+	assert.Contains(t, executionOrder, "third", "Third middleware should have executed")
+
+	finalCount := atomic.LoadInt64(toolCallCounter)
+	assert.Equal(t, int64(1), finalCount, "Add tool should have been called exactly once")
+
+	t.Logf("🔧 Tool called %d times", finalCount)
+	t.Logf("📝 Middleware execution order: %v", executionOrder)
+	t.Logf("✅ Final result: %d", result.Data.Sum)
 }

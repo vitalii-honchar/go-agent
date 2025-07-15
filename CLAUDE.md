@@ -34,6 +34,27 @@ go get <package>
 go mod tidy
 ```
 
+### Release Process
+We use semantic versioning (semver) for library releases. To create a new release:
+
+1. **Add git tag** with semantic version:
+   ```bash
+   git tag v1.2.3
+   git push origin v1.2.3
+   ```
+
+2. **Create release with GitHub CLI tool**:
+   ```bash
+   gh release create v1.2.3 --title "Release v1.2.3" --notes "Release notes here"
+   ```
+
+**Semantic Versioning Guidelines:**
+- **MAJOR** version (v2.0.0): Breaking changes, incompatible API changes
+- **MINOR** version (v1.1.0): New features, backwards compatible
+- **PATCH** version (v1.0.1): Bug fixes, backwards compatible
+
+**Note:** Since this is an early-stage library, we prioritize developer experience over strict backward compatibility. Breaking changes may occur frequently in v0.x.x versions.
+
 ## Project Structure
 
 This is a Go AI Agent library project structure:

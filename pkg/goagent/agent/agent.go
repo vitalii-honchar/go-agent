@@ -121,7 +121,8 @@ var (
 	// ErrToolError is returned when a tool call fails
 	ErrToolError = errors.New("tool error occurred")
 	// ErrLLMCall is returned when an LLM call fails
-	ErrLLMCall = errors.New("LLM call error occurred")
+	ErrLLMCall         = errors.New("LLM call error occurred")
+	ErrMiddlewareError = errors.New("middleware error occurred")
 	// ErrFinish is returned when LLM execution is finished
 	ErrFinish = errors.New("LLM finished execution")
 	// ErrToolNotFound is returned when a requested tool is not found
@@ -132,6 +133,8 @@ var (
 	ErrCannotCreateSchema = errors.New("cannot create schema from output type")
 	// ErrEmptySystemPrompt is returned when system prompt is empty
 	ErrEmptySystemPrompt = errors.New("system prompt cannot be empty")
+	// ErrAccessDenied is returned when RBAC middleware denies access
+	ErrAccessDenied = errors.New("access denied: user not authorized to use tool")
 )
 
 var systemPromptTemplate = NewPrompt(`You are an agent that implements the ReAct ` +
@@ -184,10 +187,13 @@ type Agent[T any] struct {
 	outputSchema     *T
 	systemPrompt     Prompt
 	behavior         string
+	middlewares      []AgentMiddleware
 }
 
 // AgentOption is a function that configures an Agent
 type AgentOption[T any] func(*Agent[T])
+
+type AgentMiddleware func(context.Context, *AgentState, llm.LLMMessage) (llm.LLMMessage, error)
 
 // NewAgent creates a new Agent with the given options.
 //
@@ -310,6 +316,12 @@ func WithDefaultToolLimit[T any](limit int) AgentOption[T] {
 	}
 }
 
+func WithMiddleware[T any](middleware AgentMiddleware) AgentOption[T] {
+	return func(a *Agent[T]) {
+		a.middlewares = append(a.middlewares, middleware)
+	}
+}
+
 // AgentState represents the current state of agent execution
 type AgentState struct {
 	Messages []llm.LLMMessage
@@ -333,6 +345,11 @@ func (a *Agent[T]) Run(ctx context.Context, input any) (*AgentResult[T], error) 
 		llmMessage, err := a.llm.Call(ctx, state.Messages)
 		if err != nil {
 			return nil, fmt.Errorf("%w: %s", ErrLLMCall, err)
+		}
+
+		llmMessage, err = a.runMiddlewares(ctx, state, llmMessage)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %w", ErrMiddlewareError, err)
 		}
 
 		if llmMessage.ToolCalls != nil {
@@ -366,6 +383,18 @@ func (a *Agent[T]) Run(ctx context.Context, input any) (*AgentResult[T], error) 
 
 		state.Messages[0].Content = newSystemPrompt
 	}
+}
+
+func (a *Agent[T]) runMiddlewares(ctx context.Context, state *AgentState, llmMessage llm.LLMMessage) (llm.LLMMessage, error) {
+	for _, middleware := range a.middlewares {
+		var err error
+		llmMessage, err = middleware(ctx, state, llmMessage)
+		if err != nil {
+			return llm.LLMMessage{}, err
+		}
+	}
+
+	return llmMessage, nil
 }
 
 func (a *Agent[T]) getToolLimit(name string) int {
