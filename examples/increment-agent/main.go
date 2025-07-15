@@ -41,9 +41,10 @@ func main() {
 	}
 
 	addTool := createAddTool()
+	loggingMiddleware := createLoggingMiddleware()
 
 	incrementAgent, err := agent.NewAgent(
-		agent.WithName[IncrementResult]("increment-agent"),
+		agent.WithName[IncrementResult]("increment_agent"),
 		agent.WithLLMConfig[IncrementResult](llm.LLMConfig{
 			Type:        llm.LLMTypeOpenAI,
 			APIKey:      apiKey,
@@ -57,6 +58,7 @@ func main() {
 		),
 		agent.WithTool[IncrementResult]("add", addTool),
 		agent.WithToolLimit[IncrementResult]("add", 3),
+		agent.WithMiddleware[IncrementResult](loggingMiddleware),
 	)
 
 	if err != nil {
@@ -107,4 +109,35 @@ func createAddTool() llm.LLMTool {
 	}
 
 	return tool
+}
+
+func createLoggingMiddleware() agent.AgentMiddleware {
+	return func(ctx context.Context, state *agent.AgentState, llmMessage llm.LLMMessage) (llm.LLMMessage, error) {
+		log.Printf("🤖 LLM Message [%d chars]: %s", len(llmMessage.Content), truncateContent(llmMessage.Content, 200))
+
+		if len(llmMessage.ToolCalls) > 0 {
+			log.Printf("🔧 Tool Calls: %d", len(llmMessage.ToolCalls))
+			for i, toolCall := range llmMessage.ToolCalls {
+				log.Printf("   #%d: %s(%s)", i+1, toolCall.ToolName, truncateContent(toolCall.Args, 100))
+			}
+		}
+
+		if len(llmMessage.ToolResults) > 0 {
+			log.Printf("📋 Tool Results: %d", len(llmMessage.ToolResults))
+		}
+
+		if llmMessage.End {
+			log.Printf("🏁 LLM Execution Complete")
+		}
+
+		return llmMessage, nil
+	}
+}
+
+func truncateContent(content string, maxLen int) string {
+	if len(content) <= maxLen {
+		return content
+	}
+
+	return content[:maxLen] + "..."
 }

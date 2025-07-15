@@ -57,8 +57,10 @@ func createAnalyzerAgent() (*agent.Agent[AgentResult], error) {
 		log.Fatal("OPENAI_API_KEY environment variable is not set")
 	}
 
+	loggingMiddleware := createLoggingMiddleware()
+
 	analyzerAgent, err := agent.NewAgent(
-		agent.WithName[AgentResult]("analyzer-agent"),
+		agent.WithName[AgentResult]("analyzer_agent"),
 		agent.WithLLMConfig[AgentResult](llm.LLMConfig{
 			Type:        llm.LLMTypeOpenAI,
 			APIKey:      apiKey,
@@ -68,6 +70,7 @@ func createAnalyzerAgent() (*agent.Agent[AgentResult], error) {
 		agent.WithBehavior[AgentResult](getAnalysisBehavior()),
 		agent.WithTool[AgentResult]("http", createHttpTool()),
 		agent.WithToolLimit[AgentResult]("http", 10),
+		agent.WithMiddleware[AgentResult](loggingMiddleware),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create analyzer agent: %w", err)
@@ -199,4 +202,35 @@ func extractHeaders(header http.Header) map[string]string {
 	}
 
 	return headers
+}
+
+func createLoggingMiddleware() agent.AgentMiddleware {
+	return func(ctx context.Context, state *agent.AgentState, llmMessage llm.LLMMessage) (llm.LLMMessage, error) {
+		log.Printf("🤖 LLM Message [%d chars]: %s", len(llmMessage.Content), truncateContent(llmMessage.Content, 300))
+
+		if len(llmMessage.ToolCalls) > 0 {
+			log.Printf("🔧 Tool Calls: %d", len(llmMessage.ToolCalls))
+			for i, toolCall := range llmMessage.ToolCalls {
+				log.Printf("   #%d: %s(%s)", i+1, toolCall.ToolName, truncateContent(toolCall.Args, 150))
+			}
+		}
+
+		if len(llmMessage.ToolResults) > 0 {
+			log.Printf("📋 Tool Results: %d", len(llmMessage.ToolResults))
+		}
+
+		if llmMessage.End {
+			log.Printf("🏁 LLM Execution Complete")
+		}
+
+		return llmMessage, nil
+	}
+}
+
+func truncateContent(content string, maxLen int) string {
+	if len(content) <= maxLen {
+		return content
+	}
+
+	return content[:maxLen] + "..."
 }

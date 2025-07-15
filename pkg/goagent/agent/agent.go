@@ -385,7 +385,11 @@ func (a *Agent[T]) Run(ctx context.Context, input any) (*AgentResult[T], error) 
 	}
 }
 
-func (a *Agent[T]) runMiddlewares(ctx context.Context, state *AgentState, llmMessage llm.LLMMessage) (llm.LLMMessage, error) {
+func (a *Agent[T]) runMiddlewares(
+	ctx context.Context,
+	state *AgentState,
+	llmMessage llm.LLMMessage,
+) (llm.LLMMessage, error) {
 	for _, middleware := range a.middlewares {
 		var err error
 		llmMessage, err = middleware(ctx, state, llmMessage)

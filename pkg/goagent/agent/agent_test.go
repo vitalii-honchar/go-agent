@@ -521,7 +521,7 @@ func TestWithSystemPrompt(t *testing.T) {
 		agent.WithLLMConfig[AddNumbersResult](llm.LLMConfig{
 			Type:        llm.LLMTypeOpenAI,
 			APIKey:      apiKey,
-			Model:       "gpt-4o-mini",
+			Model:       "gpt-4.1",
 			Temperature: 0.0,
 		}),
 		agent.WithBehavior[AddNumbersResult]("Add numbers using the add tool"),
@@ -608,7 +608,11 @@ func TestMiddlewareLogging(t *testing.T) {
 
 	// Create a logging middleware that tracks LLM calls
 	var logEntries []string
-	loggingMiddleware := func(ctx context.Context, state *agent.AgentState, llmMessage llm.LLMMessage) (llm.LLMMessage, error) {
+	loggingMiddleware := func(
+		ctx context.Context,
+		state *agent.AgentState,
+		llmMessage llm.LLMMessage,
+	) (llm.LLMMessage, error) {
 		logEntries = append(logEntries, fmt.Sprintf("LLM Response: content_length=%d, tool_calls=%d",
 			len(llmMessage.Content), len(llmMessage.ToolCalls)))
 
@@ -621,7 +625,7 @@ func TestMiddlewareLogging(t *testing.T) {
 		agent.WithLLMConfig[AddNumbersResult](llm.LLMConfig{
 			Type:        llm.LLMTypeOpenAI,
 			APIKey:      apiKey,
-			Model:       "gpt-4o-mini",
+			Model:       "gpt-4.1",
 			Temperature: 0.0,
 		}),
 		agent.WithBehavior[AddNumbersResult]("You are a calculator. Use the add tool to calculate 5+3."),
@@ -662,7 +666,11 @@ func TestMiddlewareRBAC(t *testing.T) {
 	require.NotEmpty(t, apiKey, "OPENAI_API_KEY environment variable must be set")
 
 	// Create an RBAC middleware that blocks certain operations
-	rbacMiddleware := func(ctx context.Context, state *agent.AgentState, llmMessage llm.LLMMessage) (llm.LLMMessage, error) {
+	rbacMiddleware := func(
+		ctx context.Context,
+		state *agent.AgentState,
+		llmMessage llm.LLMMessage,
+	) (llm.LLMMessage, error) {
 		// Simulate checking for forbidden operations
 		if len(llmMessage.ToolCalls) > 0 {
 			for _, toolCall := range llmMessage.ToolCalls {
@@ -682,7 +690,7 @@ func TestMiddlewareRBAC(t *testing.T) {
 		agent.WithLLMConfig[AddNumbersResult](llm.LLMConfig{
 			Type:        llm.LLMTypeOpenAI,
 			APIKey:      apiKey,
-			Model:       "gpt-4o-mini",
+			Model:       "gpt-4.1",
 			Temperature: 0.0,
 		}),
 		agent.WithBehavior[AddNumbersResult]("You are a calculator. Use the add tool to calculate 2+2."),
@@ -722,7 +730,11 @@ func TestMiddlewareMessageModification(t *testing.T) {
 	// Create a middleware that modifies LLM responses
 	var originalContent string
 	var modifiedContent string
-	modificationMiddleware := func(ctx context.Context, state *agent.AgentState, llmMessage llm.LLMMessage) (llm.LLMMessage, error) {
+	modificationMiddleware := func(
+		ctx context.Context,
+		state *agent.AgentState,
+		llmMessage llm.LLMMessage,
+	) (llm.LLMMessage, error) {
 		originalContent = llmMessage.Content
 		// Add a prefix to the LLM response content
 		llmMessage.Content = "[MODIFIED] " + llmMessage.Content
@@ -737,7 +749,7 @@ func TestMiddlewareMessageModification(t *testing.T) {
 		agent.WithLLMConfig[AddNumbersResult](llm.LLMConfig{
 			Type:        llm.LLMTypeOpenAI,
 			APIKey:      apiKey,
-			Model:       "gpt-4o-mini",
+			Model:       "gpt-4.1",
 			Temperature: 0.0,
 		}),
 		agent.WithBehavior[AddNumbersResult]("You are a calculator. Use the add tool to calculate 1+1."),
@@ -774,50 +786,93 @@ func TestMiddlewareMessageModification(t *testing.T) {
 	t.Logf("✅ Final result: %d", result.Data.Sum)
 }
 
+func createChainingMiddlewares(
+	executionOrder *[]string,
+) (agent.AgentMiddleware, agent.AgentMiddleware, agent.AgentMiddleware) {
+	firstMiddleware := func(
+		ctx context.Context,
+		state *agent.AgentState,
+		llmMessage llm.LLMMessage,
+	) (llm.LLMMessage, error) {
+		*executionOrder = append(*executionOrder, "first")
+		llmMessage.Content = "[FIRST] " + llmMessage.Content
+
+		return llmMessage, nil
+	}
+
+	secondMiddleware := func(
+		ctx context.Context,
+		state *agent.AgentState,
+		llmMessage llm.LLMMessage,
+	) (llm.LLMMessage, error) {
+		*executionOrder = append(*executionOrder, "second")
+		llmMessage.Content = "[SECOND] " + llmMessage.Content
+
+		return llmMessage, nil
+	}
+
+	thirdMiddleware := func(
+		ctx context.Context,
+		state *agent.AgentState,
+		llmMessage llm.LLMMessage,
+	) (llm.LLMMessage, error) {
+		*executionOrder = append(*executionOrder, "third")
+		llmMessage.Content = "[THIRD] " + llmMessage.Content
+
+		return llmMessage, nil
+	}
+
+	return firstMiddleware, secondMiddleware, thirdMiddleware
+}
+
 func TestMiddlewareChaining(t *testing.T) {
 	t.Parallel()
 
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	require.NotEmpty(t, apiKey, "OPENAI_API_KEY environment variable must be set")
 
-	// Create multiple middleware that modify content in sequence
 	var executionOrder []string
-
-	firstMiddleware := func(ctx context.Context, state *agent.AgentState, llmMessage llm.LLMMessage) (llm.LLMMessage, error) {
-		executionOrder = append(executionOrder, "first")
-		llmMessage.Content = "[FIRST] " + llmMessage.Content
-		return llmMessage, nil
-	}
-
-	secondMiddleware := func(ctx context.Context, state *agent.AgentState, llmMessage llm.LLMMessage) (llm.LLMMessage, error) {
-		executionOrder = append(executionOrder, "second")
-		llmMessage.Content = "[SECOND] " + llmMessage.Content
-		return llmMessage, nil
-	}
-
-	thirdMiddleware := func(ctx context.Context, state *agent.AgentState, llmMessage llm.LLMMessage) (llm.LLMMessage, error) {
-		executionOrder = append(executionOrder, "third")
-		llmMessage.Content = "[THIRD] " + llmMessage.Content
-		return llmMessage, nil
-	}
+	first, second, third := createChainingMiddlewares(&executionOrder)
 
 	toolCallCounter, addTool := createAddTool(t)
-	chainingAgent, err := agent.NewAgent(
+	chainingAgent := createChainingAgent(t, apiKey, addTool, first, second, third)
+
+	result := runChainingTest(t, chainingAgent)
+	verifyMiddlewareChaining(t, result, executionOrder, toolCallCounter)
+}
+
+func createChainingAgent(
+	t *testing.T,
+	apiKey string,
+	addTool llm.LLMTool,
+	middlewares ...agent.AgentMiddleware,
+) *agent.Agent[AddNumbersResult] {
+	options := []agent.AgentOption[AddNumbersResult]{
 		agent.WithName[AddNumbersResult]("chaining_agent"),
 		agent.WithLLMConfig[AddNumbersResult](llm.LLMConfig{
 			Type:        llm.LLMTypeOpenAI,
 			APIKey:      apiKey,
-			Model:       "gpt-4o-mini",
+			Model:       "gpt-4.1",
 			Temperature: 0.0,
 		}),
 		agent.WithBehavior[AddNumbersResult]("You are a calculator. Use the add tool to calculate 4+4."),
 		agent.WithTool[AddNumbersResult]("add", addTool),
-		agent.WithMiddleware[AddNumbersResult](firstMiddleware),
-		agent.WithMiddleware[AddNumbersResult](secondMiddleware),
-		agent.WithMiddleware[AddNumbersResult](thirdMiddleware),
-	)
+	}
+
+	for _, middleware := range middlewares {
+		options = append(options, agent.WithMiddleware[AddNumbersResult](middleware))
+	}
+
+	chainingAgent, err := agent.NewAgent(options...)
 	require.NoError(t, err)
 
+	return chainingAgent
+}
+
+func runChainingTest(
+	t *testing.T,
+	chainingAgent *agent.Agent[AddNumbersResult],
+) *agent.AgentResult[AddNumbersResult] {
 	input := AddNumbers{Num1: 4, Num2: 4}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -825,15 +880,22 @@ func TestMiddlewareChaining(t *testing.T) {
 	t.Logf("🚀 Starting middleware chaining test")
 
 	result, err := chainingAgent.Run(ctx, input)
-
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.NotNil(t, result.Data)
 	assert.Equal(t, 8, result.Data.Sum)
 
+	return result
+}
+
+func verifyMiddlewareChaining(
+	t *testing.T,
+	result *agent.AgentResult[AddNumbersResult],
+	executionOrder []string,
+	toolCallCounter *int64,
+) {
 	// Verify middleware execution order
 	assert.NotEmpty(t, executionOrder, "Should have recorded middleware execution order")
-	// Middleware should execute in the order they were added
 	assert.Contains(t, executionOrder, "first", "First middleware should have executed")
 	assert.Contains(t, executionOrder, "second", "Second middleware should have executed")
 	assert.Contains(t, executionOrder, "third", "Third middleware should have executed")
