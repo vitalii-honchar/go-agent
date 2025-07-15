@@ -77,7 +77,7 @@ func (o *OpenAILLM) Call(ctx context.Context, msgs []llm.LLMMessage) (llm.LLMMes
 		return llm.LLMMessage{}, err
 	}
 
-	return o.newLLMMessage(choice), nil
+	return o.newLLMMessage(choice)
 }
 
 func (o *OpenAILLM) CallWithStructuredOutput(ctx context.Context, msgs []llm.LLMMessage, schemaT any) (string, error) {
@@ -109,22 +109,31 @@ func (o *OpenAILLM) callLLM(
 	return completion.Choices[0], nil
 }
 
-func (o *OpenAILLM) newLLMMessage(choice openai.ChatCompletionChoice) llm.LLMMessage {
+func (o *OpenAILLM) newLLMMessage(choice openai.ChatCompletionChoice) (llm.LLMMessage, error) {
+	toolCalls, err := o.createLLMToolCalls(choice)
+	if err != nil {
+		return llm.LLMMessage{}, fmt.Errorf("failed to create tool calls: %w", err)
+	}
+
 	return llm.LLMMessage{
 		Type:      llm.LLMMessageTypeAssistant,
 		Content:   choice.Message.Content,
-		ToolCalls: o.createLLMToolCalls(choice),
+		ToolCalls: toolCalls,
 		End:       choice.FinishReason == openAIFinishReasonStop || choice.FinishReason == openAIFinishReasonLength,
-	}
+	}, nil
 }
 
-func (o *OpenAILLM) createLLMToolCalls(choice openai.ChatCompletionChoice) []llm.LLMToolCall {
+func (o *OpenAILLM) createLLMToolCalls(choice openai.ChatCompletionChoice) ([]llm.LLMToolCall, error) {
 	res := make([]llm.LLMToolCall, 0, len(choice.Message.ToolCalls))
 	for _, toolCall := range choice.Message.ToolCalls {
-		res = append(res, llm.NewLLMToolCall(toolCall.ID, toolCall.Function.Name, toolCall.Function.Arguments))
+		toolCallObj, err := llm.NewLLMToolCall(toolCall.ID, toolCall.Function.Name, toolCall.Function.Arguments)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create tool call: %w", err)
+		}
+		res = append(res, toolCallObj)
 	}
 
-	return res
+	return res, nil
 }
 
 func (o *OpenAILLM) createParameters(messages []llm.LLMMessage, schemaT any) (openai.ChatCompletionNewParams, error) {

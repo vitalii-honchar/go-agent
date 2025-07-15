@@ -10,9 +10,9 @@ lint: fmt
 
 test:
 	@if [ -f .env ]; then \
-		export $$(cat .env | xargs) && go test -v -coverprofile=coverage.out ./pkg/...; \
+		export $$(cat .env | xargs) && go test -v -coverprofile=coverage.out ./pkg/... ./internal/...; \
 	else \
-		go test -v -coverprofile=coverage.out ./pkg/...; \
+		go test -v -coverprofile=coverage.out ./pkg/... ./internal/...; \
 	fi
 	go tool cover -func=coverage.out
 

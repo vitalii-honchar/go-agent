@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+
+	"github.com/vitalii-honchar/go-agent/internal/validation"
 )
 
 var (
@@ -23,13 +25,35 @@ type LLMTool struct {
 type LLMToolOption func(tool *LLMTool)
 
 // NewLLMTool creates a new LLM tool with the given options
-func NewLLMTool(options ...LLMToolOption) LLMTool {
+func NewLLMTool(options ...LLMToolOption) (LLMTool, error) {
 	tool := &LLMTool{}
 	for _, opt := range options {
 		opt(tool)
 	}
 
-	return *tool
+	err := tool.validate()
+	if err != nil {
+		return LLMTool{}, fmt.Errorf("failed to create LLM tool: %w", err)
+	}
+
+	return *tool, nil
+}
+
+func (t *LLMTool) validate() error {
+	if err := validation.NameIsValid(t.Name); err != nil {
+		return fmt.Errorf("tool: %w", err)
+	}
+	if err := validation.DescriptionIsValid(t.Description); err != nil {
+		return fmt.Errorf("description: %w", err)
+	}
+	if err := validation.NotNil(t.ParametersSchema); err != nil {
+		return fmt.Errorf("parameters schema: %w", err)
+	}
+	if t.Call == nil {
+		return fmt.Errorf("call: %w: value cannot be nil", validation.ErrValidationFailed)
+	}
+
+	return nil
 }
 
 // WithLLMToolName sets the name of the tool
@@ -93,11 +117,32 @@ type LLMToolCall struct {
 	Args     string `json:"args"`
 }
 
-// NewLLMToolCall creates a new LLM tool call
-func NewLLMToolCall(id string, toolName string, args string) LLMToolCall {
-	return LLMToolCall{
+// NewLLMToolCall creates a new LLM tool call with validation
+func NewLLMToolCall(id string, toolName string, args string) (LLMToolCall, error) {
+	toolCall := LLMToolCall{
 		ID:       id,
 		ToolName: toolName,
 		Args:     args,
 	}
+
+	err := toolCall.validate()
+	if err != nil {
+		return LLMToolCall{}, fmt.Errorf("failed to create LLM tool call: %w", err)
+	}
+
+	return toolCall, nil
+}
+
+func (tc *LLMToolCall) validate() error {
+	if err := validation.StringIsNotEmpty(tc.ID); err != nil {
+		return fmt.Errorf("id: %w", err)
+	}
+	if err := validation.NameIsValid(tc.ToolName); err != nil {
+		return fmt.Errorf("tool name: %w", err)
+	}
+	if err := validation.StringIsNotEmpty(tc.Args); err != nil {
+		return fmt.Errorf("args: %w", err)
+	}
+
+	return nil
 }

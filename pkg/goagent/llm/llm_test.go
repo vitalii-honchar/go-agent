@@ -65,32 +65,42 @@ func TestNewLLMMessage(t *testing.T) {
 
 func TestNewLLMTool(t *testing.T) {
 	t.Parallel()
-	tool := llm.NewLLMTool()
+	_, err := llm.NewLLMTool()
 
-	// Default tool should have empty values
-	assert.Empty(t, tool.Name)
-	assert.Empty(t, tool.Description)
-	assert.Nil(t, tool.ParametersSchema)
-	assert.Nil(t, tool.Call)
+	// Should fail validation with no options
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to create LLM tool")
 }
 
 func TestWithLLMToolName(t *testing.T) {
 	t.Parallel()
-	name := "test-tool"
-	tool := llm.NewLLMTool(
+	name := "test_tool"
+	tool, err := llm.NewLLMTool(
 		llm.WithLLMToolName(name),
+		llm.WithLLMToolDescription("A test tool"),
+		llm.WithLLMToolParametersSchema[struct{}](),
+		llm.WithLLMToolCall(func(callID string, params struct{}) (llm.BaseLLMToolResult, error) {
+			return llm.BaseLLMToolResult{ID: callID}, nil
+		}),
 	)
 
+	require.NoError(t, err)
 	assert.Equal(t, name, tool.Name)
 }
 
 func TestWithLLMToolDescription(t *testing.T) {
 	t.Parallel()
 	description := "A test tool for testing"
-	tool := llm.NewLLMTool(
+	tool, err := llm.NewLLMTool(
+		llm.WithLLMToolName("test_tool"),
 		llm.WithLLMToolDescription(description),
+		llm.WithLLMToolParametersSchema[struct{}](),
+		llm.WithLLMToolCall(func(callID string, params struct{}) (llm.BaseLLMToolResult, error) {
+			return llm.BaseLLMToolResult{ID: callID}, nil
+		}),
 	)
 
+	require.NoError(t, err)
 	assert.Equal(t, description, tool.Description)
 }
 
@@ -100,10 +110,16 @@ func TestWithLLMToolParametersSchema(t *testing.T) {
 		Value string `json:"value"`
 	}
 
-	tool := llm.NewLLMTool(
+	tool, err := llm.NewLLMTool(
+		llm.WithLLMToolName("test_tool"),
+		llm.WithLLMToolDescription("A test tool"),
 		llm.WithLLMToolParametersSchema[TestParams](),
+		llm.WithLLMToolCall(func(callID string, params TestParams) (llm.BaseLLMToolResult, error) {
+			return llm.BaseLLMToolResult{ID: callID}, nil
+		}),
 	)
 
+	require.NoError(t, err)
 	assert.NotNil(t, tool.ParametersSchema)
 	_, ok := tool.ParametersSchema.(*TestParams)
 	assert.True(t, ok)
@@ -127,10 +143,14 @@ func TestWithLLMToolCall(t *testing.T) {
 		}, nil
 	}
 
-	tool := llm.NewLLMTool(
+	tool, err := llm.NewLLMTool(
+		llm.WithLLMToolName("test_tool"),
+		llm.WithLLMToolDescription("A test tool"),
+		llm.WithLLMToolParametersSchema[TestParams](),
 		llm.WithLLMToolCall[TestParams, TestResult](callFunc),
 	)
 
+	require.NoError(t, err)
 	assert.NotNil(t, tool.Call)
 
 	// Test the call function
@@ -161,12 +181,16 @@ func TestWithLLMToolCall_InvalidJSON(t *testing.T) {
 		}, nil
 	}
 
-	tool := llm.NewLLMTool(
+	tool, err := llm.NewLLMTool(
+		llm.WithLLMToolName("test_tool"),
+		llm.WithLLMToolDescription("A test tool"),
+		llm.WithLLMToolParametersSchema[TestParams](),
 		llm.WithLLMToolCall[TestParams, TestResult](callFunc),
 	)
+	require.NoError(t, err)
 
 	// Test with invalid JSON
-	_, err := tool.Call("test-id", `invalid json`)
+	_, err = tool.Call("test-id", `invalid json`)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, llm.ErrInvalidArguments)
 }
@@ -183,7 +207,7 @@ func TestLLMTool_CompleteConfiguration(t *testing.T) {
 		Sum int `json:"sum"`
 	}
 
-	tool := llm.NewLLMTool(
+	tool, err := llm.NewLLMTool(
 		llm.WithLLMToolName("add"),
 		llm.WithLLMToolDescription("Adds two numbers"),
 		llm.WithLLMToolParametersSchema[TestParams](),
@@ -195,6 +219,7 @@ func TestLLMTool_CompleteConfiguration(t *testing.T) {
 		}),
 	)
 
+	require.NoError(t, err)
 	assert.Equal(t, "add", tool.Name)
 	assert.Equal(t, "Adds two numbers", tool.Description)
 	assert.NotNil(t, tool.ParametersSchema)
@@ -219,11 +244,12 @@ func TestBaseLLMToolResult_GetID(t *testing.T) {
 func TestNewLLMToolCall(t *testing.T) {
 	t.Parallel()
 	callID := "call-123"
-	toolName := "test-tool"
+	toolName := "test_tool"
 	args := `{"param": "value"}`
 
-	toolCall := llm.NewLLMToolCall(callID, toolName, args)
+	toolCall, err := llm.NewLLMToolCall(callID, toolName, args)
 
+	require.NoError(t, err)
 	assert.Equal(t, callID, toolCall.ID)
 	assert.Equal(t, toolName, toolCall.ToolName)
 	assert.Equal(t, args, toolCall.Args)

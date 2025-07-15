@@ -93,7 +93,7 @@ func TestOpenAILLM_CallWithTools(t *testing.T) {
 	require.NotEmpty(t, apiKey, "OPENAI_API_KEY environment variable must be set")
 
 	// Create a simple add tool
-	addTool := llm.NewLLMTool(
+	addTool, err := llm.NewLLMTool(
 		llm.WithLLMToolName("add"),
 		llm.WithLLMToolDescription("Adds two numbers together"),
 		llm.WithLLMToolParametersSchema[AddToolParams](),
@@ -104,6 +104,7 @@ func TestOpenAILLM_CallWithTools(t *testing.T) {
 			}, nil
 		}),
 	)
+	require.NoError(t, err, "Failed to create add tool")
 
 	openaiLLM := openai.NewOpenAILLM(
 		openai.WithAPIKey(apiKey),
@@ -176,7 +177,7 @@ func TestOpenAILLM_CallWithAssistantMessages(t *testing.T) {
 }
 
 func createTestAddTool() llm.LLMTool {
-	return llm.NewLLMTool(
+	tool, err := llm.NewLLMTool(
 		llm.WithLLMToolName("add"),
 		llm.WithLLMToolDescription("Adds two numbers together"),
 		llm.WithLLMToolParametersSchema[AddToolParams](),
@@ -187,6 +188,11 @@ func createTestAddTool() llm.LLMTool {
 			}, nil
 		}),
 	)
+	if err != nil {
+		panic("Failed to create test add tool: " + err.Error())
+	}
+
+	return tool
 }
 
 func createTestMessages() []llm.LLMMessage {

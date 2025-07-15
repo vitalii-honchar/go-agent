@@ -83,7 +83,7 @@ func main() {
 func createAddTool() llm.LLMTool {
 	counter := new(int64)
 
-	return llm.NewLLMTool(
+	tool, err := llm.NewLLMTool(
 		llm.WithLLMToolName("add"),
 		llm.WithLLMToolDescription("Adds two numbers together"),
 		llm.WithLLMToolParametersSchema[AddToolParams](),
@@ -102,4 +102,9 @@ func createAddTool() llm.LLMTool {
 			return result, nil
 		}),
 	)
+	if err != nil {
+		log.Fatalf("Failed to create add tool: %v", err)
+	}
+
+	return tool
 }

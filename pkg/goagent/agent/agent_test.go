@@ -453,7 +453,7 @@ type AddToolParams struct {
 func createAddTool(t *testing.T) (*int64, llm.LLMTool) {
 	counter := new(int64)
 
-	return counter, llm.NewLLMTool(
+	tool, err := llm.NewLLMTool(
 		llm.WithLLMToolName("add"),
 		llm.WithLLMToolDescription("Adds two numbers together"),
 		llm.WithLLMToolParametersSchema[AddToolParams](),
@@ -472,6 +472,9 @@ func createAddTool(t *testing.T) (*int64, llm.LLMTool) {
 			return result, nil
 		}),
 	)
+	require.NoError(t, err, "Failed to create add tool")
+
+	return counter, tool
 }
 
 type HashToolParams struct {
@@ -481,7 +484,7 @@ type HashToolParams struct {
 func createHashTool(t *testing.T) (*int64, llm.LLMTool) {
 	counter := new(int64)
 
-	return counter, llm.NewLLMTool(
+	tool, err := llm.NewLLMTool(
 		llm.WithLLMToolName("hash"),
 		llm.WithLLMToolDescription("Computes SHA256 hash of input string"),
 		llm.WithLLMToolParametersSchema[HashToolParams](),
@@ -500,6 +503,9 @@ func createHashTool(t *testing.T) (*int64, llm.LLMTool) {
 				}, nil
 			}),
 	)
+	require.NoError(t, err, "Failed to create hash tool")
+
+	return counter, tool
 }
 
 func TestWithSystemPrompt(t *testing.T) {
@@ -576,7 +582,7 @@ func TestNewAgentResult_EmptyMessages(t *testing.T) {
 }
 
 func createTestAddTool() llm.LLMTool {
-	return llm.NewLLMTool(
+	tool, err := llm.NewLLMTool(
 		llm.WithLLMToolName("add"),
 		llm.WithLLMToolDescription("Adds two numbers"),
 		llm.WithLLMToolParametersSchema[AddToolParams](),
@@ -587,4 +593,9 @@ func createTestAddTool() llm.LLMTool {
 			}, nil
 		}),
 	)
+	if err != nil {
+		panic("Failed to create test add tool: " + err.Error())
+	}
+
+	return tool
 }

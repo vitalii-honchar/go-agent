@@ -107,7 +107,7 @@ type TestToolResult struct {
 }
 
 func createTestTool() llm.LLMTool {
-	return llm.NewLLMTool(
+	tool, err := llm.NewLLMTool(
 		llm.WithLLMToolName("test"),
 		llm.WithLLMToolDescription("Test tool"),
 		llm.WithLLMToolParametersSchema[TestToolParams](),
@@ -118,4 +118,9 @@ func createTestTool() llm.LLMTool {
 			}, nil
 		}),
 	)
+	if err != nil {
+		panic("Failed to create test tool: " + err.Error())
+	}
+
+	return tool
 }

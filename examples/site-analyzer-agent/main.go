@@ -126,12 +126,17 @@ func runAnalysis(ctx context.Context, analyzerAgent *agent.Agent[AgentResult], i
 }
 
 func createHttpTool() llm.LLMTool {
-	return llm.NewLLMTool(
+	tool, err := llm.NewLLMTool(
 		llm.WithLLMToolName("http"),
 		llm.WithLLMToolDescription("Fetches content from a URL via HTTP GET request"),
 		llm.WithLLMToolParametersSchema[HttpToolParams](),
 		llm.WithLLMToolCall(handleHttpRequest),
 	)
+	if err != nil {
+		log.Fatalf("Failed to create http tool: %v", err)
+	}
+
+	return tool
 }
 
 func handleHttpRequest(callID string, params HttpToolParams) (HttpToolResult, error) {
