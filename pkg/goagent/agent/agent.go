@@ -110,6 +110,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/vitalii-honchar/go-agent/internal/validation"
 	"github.com/vitalii-honchar/go-agent/pkg/goagent/llm"
 	"github.com/vitalii-honchar/go-agent/pkg/goagent/llmfactory"
 )
@@ -230,6 +231,11 @@ func NewAgent[T any](options ...AgentOption[T]) (*Agent[T], error) {
 		opt(agent)
 	}
 
+	err := agent.validate()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create agent: %w", err)
+	}
+
 	agentLLM, err := llmfactory.CreateLLM(agent.llmConfig, agent.tools)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create LLM: %w", err)
@@ -239,6 +245,20 @@ func NewAgent[T any](options ...AgentOption[T]) (*Agent[T], error) {
 	agent.outputSchema = new(T)
 
 	return agent, nil
+}
+
+func (a *Agent[T]) validate() error {
+	if err := validation.NameIsValid(a.name); err != nil {
+		return fmt.Errorf("name: %w", err)
+	}
+	if err := validation.StringIsNotEmpty(a.behavior); err != nil {
+		return fmt.Errorf("behavior: %w", err)
+	}
+	if err := a.llmConfig.Validate(); err != nil {
+		return fmt.Errorf("llm config: %w", err)
+	}
+
+	return nil
 }
 
 // WithName sets the agent's name

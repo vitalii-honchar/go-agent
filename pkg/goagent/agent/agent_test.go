@@ -23,7 +23,7 @@ func TestSumAgent(t *testing.T) {
 
 	toolCallCounter, addTool := createAddTool(t)
 	calculatorAgent, err := agent.NewAgent(
-		agent.WithName[AddNumbersResult]("calculator"),
+		agent.WithName[AddNumbersResult]("calculator_agent"),
 		agent.WithLLMConfig[AddNumbersResult](llm.LLMConfig{
 			Type:        llm.LLMTypeOpenAI,
 			APIKey:      apiKey,
@@ -70,7 +70,7 @@ func TestHashAgent(t *testing.T) {
 	require.NotEmpty(t, apiKey, "OPENAI_API_KEY environment variable must be set")
 
 	hashAgent, err := agent.NewAgent(
-		agent.WithName[HashResult]("hasher"),
+		agent.WithName[HashResult]("hash_agent"),
 		agent.WithLLMConfig[HashResult](llm.LLMConfig{
 			Type:        llm.LLMTypeOpenAI,
 			APIKey:      apiKey,
@@ -114,7 +114,7 @@ func TestSequentialToolCalls(t *testing.T) {
 	require.NotEmpty(t, apiKey, "OPENAI_API_KEY environment variable must be set")
 
 	incrementAgent, err := agent.NewAgent(
-		agent.WithName[IncrementResult]("incrementer"),
+		agent.WithName[IncrementResult]("increment_agent"),
 		agent.WithLLMConfig[IncrementResult](llm.LLMConfig{
 			Type:        llm.LLMTypeOpenAI,
 			APIKey:      apiKey,
@@ -189,7 +189,7 @@ Do not try to calculate yourself - you will get wrong results. Always use the ad
 Continue making these precise floating point additions until you have made at least 3 tool calls.`
 
 	limitTestAgent, err := agent.NewAgent(
-		agent.WithName[IncrementResult]("limit-tester"),
+		agent.WithName[IncrementResult]("limit_test_agent"),
 		agent.WithLLMConfig[IncrementResult](llm.LLMConfig{
 			Type:        llm.LLMTypeOpenAI,
 			APIKey:      apiKey,
@@ -242,7 +242,7 @@ func TestMultiToolLimitReached(t *testing.T) {
 	require.NotEmpty(t, apiKey, "OPENAI_API_KEY environment variable must be set")
 
 	multiToolAgent, err := agent.NewAgent(
-		agent.WithName[IncrementResult]("multi-tool-tester"),
+		agent.WithName[IncrementResult]("multi_tool_agent"),
 		agent.WithLLMConfig[IncrementResult](llm.LLMConfig{
 			Type:        llm.LLMTypeOpenAI,
 			APIKey:      apiKey,
@@ -305,7 +305,7 @@ func TestDefaultToolLimit(t *testing.T) {
 
 	// Agent with no explicit tool limits - should use default limit of 3
 	defaultLimitAgent, err := agent.NewAgent(
-		agent.WithName[IncrementResult]("default-limit-tester"),
+		agent.WithName[IncrementResult]("default_limit_agent"),
 		agent.WithLLMConfig[IncrementResult](llm.LLMConfig{
 			Type:        llm.LLMTypeOpenAI,
 			APIKey:      apiKey,
@@ -359,7 +359,7 @@ func TestCustomDefaultToolLimit(t *testing.T) {
 
 	// Agent with custom default tool limit of 2
 	customDefaultAgent, err := agent.NewAgent(
-		agent.WithName[IncrementResult]("custom-default-tester"),
+		agent.WithName[IncrementResult]("custom_default_agent"),
 		agent.WithLLMConfig[IncrementResult](llm.LLMConfig{
 			Type:        llm.LLMTypeOpenAI,
 			APIKey:      apiKey,
@@ -517,7 +517,7 @@ func TestWithSystemPrompt(t *testing.T) {
 	customPrompt := agent.NewPrompt("You are a custom agent with special behavior: {{.Behavior}}")
 
 	testAgent, err := agent.NewAgent(
-		agent.WithName[AddNumbersResult]("custom-prompt-agent"),
+		agent.WithName[AddNumbersResult]("custom_prompt_agent"),
 		agent.WithLLMConfig[AddNumbersResult](llm.LLMConfig{
 			Type:        llm.LLMTypeOpenAI,
 			APIKey:      apiKey,
