@@ -364,7 +364,7 @@ func (a *Agent[T]) Run(ctx context.Context, input any) (*AgentResult[T], error) 
 					}, ErrLimitReached
 				}
 
-				return nil, fmt.Errorf("%w: %s", ErrToolError, err)
+				return nil, err
 			}
 
 			llmMessage.ToolResults = results
@@ -462,7 +462,15 @@ func (a *Agent[T]) callTools(llmMessage llm.LLMMessage, usage map[string]int) ([
 	for _, toolCall := range llmMessage.ToolCalls {
 		tool, ok := a.tools[toolCall.ToolName]
 		if !ok {
-			return nil, fmt.Errorf("%w: %s", ErrToolNotFound, toolCall.ToolName)
+			results = append(
+				results,
+				a.createErrorToolResult(
+					toolCall.ID,
+					fmt.Errorf("%w: %s", ErrToolNotFound, toolCall.ToolName),
+				),
+			)
+
+			continue
 		}
 
 		limit := a.getToolLimit(toolCall.ToolName)
@@ -472,7 +480,9 @@ func (a *Agent[T]) callTools(llmMessage llm.LLMMessage, usage map[string]int) ([
 
 		toolRes, err := tool.Call(toolCall.ID, toolCall.Args)
 		if err != nil {
-			return nil, fmt.Errorf("%w: %s", ErrToolError, err)
+			results = append(results, a.createErrorToolResult(toolCall.ID, fmt.Errorf("%w: %s", ErrToolError, err)))
+
+			continue
 		}
 
 		usage[toolCall.ToolName]++
@@ -481,6 +491,13 @@ func (a *Agent[T]) callTools(llmMessage llm.LLMMessage, usage map[string]int) ([
 	}
 
 	return results, nil
+}
+
+func (a *Agent[T]) createErrorToolResult(callID string, err error) llm.ErrorLLMToolResult {
+	return llm.ErrorLLMToolResult{
+		BaseLLMToolResult: llm.BaseLLMToolResult{ID: callID},
+		Error:             err.Error(),
+	}
 }
 
 func (a *Agent[T]) createResult(ctx context.Context, state *AgentState) (*AgentResult[T], error) {

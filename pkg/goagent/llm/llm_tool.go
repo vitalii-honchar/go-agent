@@ -110,6 +110,11 @@ func (r BaseLLMToolResult) GetID() string {
 	return r.ID
 }
 
+type ErrorLLMToolResult struct {
+	BaseLLMToolResult
+	Error string `json:"error"`
+}
+
 // LLMToolCall represents a call to an LLM tool
 type LLMToolCall struct {
 	ID       string `json:"id"`
