@@ -94,21 +94,11 @@ func (a *DynamicAgent) Run(ctx context.Context, input json.RawMessage) (*Dynamic
 			for _, toolCall := range message.ToolCalls {
 				tool, ok := a.toolsByName[toolCall.ToolName]
 				if !ok {
-					toolResults = append(toolResults, llm.DynamicToolResult{
-						ToolCallID: toolCall.ID,
-						Error:      fmt.Sprintf("%s: %s", ErrToolNotFound, toolCall.ToolName),
-					})
-
-					continue
+					return nil, fmt.Errorf("%w: %s", ErrToolNotFound, toolCall.ToolName)
 				}
 				result, err := tool.Call(ctx, toolCall)
 				if err != nil {
-					toolResults = append(toolResults, llm.DynamicToolResult{
-						ToolCallID: toolCall.ID,
-						Error:      fmt.Sprintf("%s: %v", ErrToolError, err),
-					})
-
-					continue
+					return nil, err
 				}
 				toolResults = append(toolResults, result)
 			}
