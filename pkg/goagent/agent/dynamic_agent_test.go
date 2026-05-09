@@ -32,7 +32,7 @@ func TestDynamicAgentRunsReActLoopWithDynamicSchemas(t *testing.T) {
 	}
 	toolCalls := 0
 	runner, err := agent.NewDynamicAgent(agent.DynamicAgentConfig{
-		Name:            "dynamic-agent",
+		Name:            "dynamic_agent",
 		Behavior:        "Use tools when needed, then finish.",
 		LLM:             provider,
 		OutputSchemaRaw: json.RawMessage(`{"type":"object","required":["summary"],"properties":{"summary":{"type":"string"}}}`),
@@ -88,7 +88,7 @@ func TestDynamicAgentRunsOneProviderStepWhenProviderFinishes(t *testing.T) {
 		structuredOutput: json.RawMessage(`{"summary":"done"}`),
 	}
 	runner, err := agent.NewDynamicAgent(agent.DynamicAgentConfig{
-		Name:            "one-step-agent",
+		Name:            "one_step_agent",
 		Behavior:        "Answer directly when no tool is needed.",
 		LLM:             provider,
 		OutputSchemaRaw: json.RawMessage(`{"type":"object","required":["summary"],"properties":{"summary":{"type":"string"}}}`),
